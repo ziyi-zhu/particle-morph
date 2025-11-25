@@ -20,6 +20,10 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
   const materialRef = useRef<THREE.PointsMaterial | null>(null);
   const animationFrameRef = useRef<number>(0);
   
+  // Universe background particles
+  const universeParticlesRef = useRef<THREE.Points | null>(null);
+  const universeGeometryRef = useRef<THREE.BufferGeometry | null>(null);
+  
   // Refs to track state inside the animation loop
   const targetPositionsRef = useRef<Float32Array>(new Float32Array(0));
   const chaosPositionsRef = useRef<Float32Array>(new Float32Array(0));
@@ -194,6 +198,19 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
       materialRef.current.vertexColors = true;
       materialRef.current.needsUpdate = true;
     }
+    
+    // Update universe particle colors with same style
+    if (universeGeometryRef.current) {
+      const universeCount = 4000;
+      const universeColors = generateParticleColors(color);
+      // Use only the first 4000 colors from the generated array
+      const trimmedColors = universeColors.slice(0, universeCount * 3);
+      
+      if (universeGeometryRef.current.attributes.color) {
+        universeGeometryRef.current.attributes.color.array = trimmedColors;
+        universeGeometryRef.current.attributes.color.needsUpdate = true;
+      }
+    }
   }, [color]);
 
   // Setup Three.js
@@ -260,6 +277,60 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
       const particles = new THREE.Points(geometry, material);
       scene.add(particles);
       particlesRef.current = particles;
+
+      // Create sparse universe background particles
+      const universeCount = 4000; // More background stars
+      const universeGeometry = new THREE.BufferGeometry();
+      const universePositions = new Float32Array(universeCount * 3);
+      
+      // Distribute particles with varied distances for depth
+      for (let i = 0; i < universeCount; i++) {
+        const i3 = i * 3;
+        
+        // Varied radius: some closer (50-70), some mid (70-100), some far (100-140)
+        const radiusRand = Math.random();
+        let radius;
+        if (radiusRand < 0.4) {
+          // 40% closer particles
+          radius = 50 + Math.random() * 20;
+        } else if (radiusRand < 0.7) {
+          // 30% mid-distance particles
+          radius = 70 + Math.random() * 30;
+        } else {
+          // 30% far particles
+          radius = 100 + Math.random() * 40;
+        }
+        
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        
+        universePositions[i3] = radius * Math.sin(phi) * Math.cos(theta);
+        universePositions[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+        universePositions[i3 + 2] = radius * Math.cos(phi);
+      }
+      
+      // Use same color generation as main particles
+      const universeColors = generateParticleColors(color);
+      const trimmedColors = universeColors.slice(0, universeCount * 3);
+      
+      universeGeometry.setAttribute('position', new THREE.BufferAttribute(universePositions, 3));
+      universeGeometry.setAttribute('color', new THREE.BufferAttribute(trimmedColors, 3));
+      universeGeometryRef.current = universeGeometry;
+      
+      // Use same material properties as main particles
+      const universeMaterial = new THREE.PointsMaterial({
+        size: 0.8, // Same size as main particles
+        map: particleTexture,
+        transparent: true,
+        opacity: 0.8, // Same opacity as main particles
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        vertexColors: true
+      });
+      
+      const universeParticles = new THREE.Points(universeGeometry, universeMaterial);
+      scene.add(universeParticles);
+      universeParticlesRef.current = universeParticles;
 
       // Resize Handler
       const handleResize = () => {
@@ -338,9 +409,15 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
           rotationYRef.current += timeDelta * 0.2;
           lastTimeRef.current = time;
         }
-        // Apply rotation
+        // Apply rotation to main particles
         particlesRef.current.rotation.y = rotationYRef.current;
         particlesRef.current.rotation.x = Math.sin(time * 0.3) * 0.1;
+        
+        // Apply same rotation to universe particles
+        if (universeParticlesRef.current) {
+          universeParticlesRef.current.rotation.y = rotationYRef.current;
+          universeParticlesRef.current.rotation.x = Math.sin(time * 0.3) * 0.1;
+        }
 
         const positions = geometryRef.current.attributes.position.array as Float32Array;
         const targets = targetPositionsRef.current; // The current Shape
