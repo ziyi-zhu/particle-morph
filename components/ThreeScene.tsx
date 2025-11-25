@@ -424,9 +424,9 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
         const chaos = chaosPositionsRef.current;    // The Random Cloud
         const current = currentPositionsRef.current;
         
-        // When morph < 0.1, show 100% form (mix = 0)
+        // When morph < 0.5, show 100% form (mix = 0)
         const rawMix = expansionFactorRef.current;
-        const mix = rawMix < 0.1 ? 0 : rawMix;
+        const mix = rawMix < 0.4 ? 0 : rawMix;
         const lerpSpeed = 0.08; 
 
         for (let i = 0; i < PARTICLE_COUNT * 3; i++) {
