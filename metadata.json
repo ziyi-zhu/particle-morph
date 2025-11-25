@@ -1,0 +1,5 @@
+{
+  "name": "Particle Morph",
+  "description": "A real-time 3D particle system controlled manually.",
+  "requestFramePermissions": []
+}
