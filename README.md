@@ -1,19 +1,56 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Particle Morph
 
-# Run and deploy your AI Studio app
+A 3D particle morphing visualization that transforms between different point cloud models with interactive controls.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/drive/1UvlIy_bEt_UBPPoAgWtQp1th3NGb0qkf
+- 🎨 **Dynamic Particle Colors**: Randomized colors creating star/universe effects
+- 🔄 **Smooth Morphing**: Seamless transitions between 5 different 3D models
+- 🖱️ **Interactive Controls**: Drag to rotate, scroll to morph between shapes
+- 🎭 **Chaos Mode**: Particles expand from form into chaos and back
+- 🌈 **Color Picker**: Choose base colors with automatic complementary variations
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js and pnpm
 
 1. Install dependencies:
-   `npm install`
-2. Run the app:
-   `npm run dev`
+   ```bash
+   pnpm install
+   ```
+
+2. Run the development server:
+   ```bash
+   pnpm run dev
+   ```
+
+3. Open [http://localhost:3000](http://localhost:3000)
+
+## Build for Production
+
+```bash
+pnpm run build
+```
+
+The built files will be in the `dist` directory.
+
+## Deploy to GitHub Pages
+
+This project is configured to automatically deploy to GitHub Pages when you push to the `main` branch.
+
+### Setup:
+
+1. Go to your repository settings
+2. Navigate to **Pages** section
+3. Under **Source**, select "GitHub Actions"
+4. Push to the `main` branch to trigger deployment
+
+The repository is configured for deployment at `https://yourusername.github.io/particle-morph/`
+
+## Technologies
+
+- React + TypeScript
+- Three.js for 3D rendering
+- Vite for build tooling
+- Tailwind CSS for styling
+- Lucide React for icons

@@ -13,7 +13,7 @@ const App: React.FC = () => {
   // scrollPos drives everything. 
   // Integer values = specific models (0=Bunny, 1=Cat, 2=Table, 3=Zaghetto)
   // X.5 values = Maximum Chaos
-  const [scrollPos, setScrollPos] = useState<number>(0);
+  const [scrollPos, setScrollPos] = useState<number>(0.5); // Start with full chaos
 
   // Derived State Logic
   const shapeCount = ORDERED_SHAPES.length;
