@@ -25,6 +25,7 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
   const chaosPositionsRef = useRef<Float32Array>(new Float32Array(0));
   const currentPositionsRef = useRef<Float32Array>(new Float32Array(0));
   const expansionFactorRef = useRef(expansionFactor);
+  const particleColorsRef = useRef<Float32Array>(new Float32Array(0));
   
   // Drag rotation state
   const isDraggingRef = useRef(false);
@@ -103,10 +104,95 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
     };
   }, [shape]);
 
-  // Update Material Color
+  // Generate particle colors based on chosen color with variations
+  const generateParticleColors = (baseColor: string): Float32Array => {
+    const colors = new Float32Array(PARTICLE_COUNT * 3);
+    const colorObj = new THREE.Color(baseColor);
+    
+    // Convert to HSL for hue manipulation
+    const hsl = { h: 0, s: 0, l: 0 };
+    colorObj.getHSL(hsl);
+    
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const i3 = i * 3;
+      const rand = Math.random();
+      
+      // 60% particles: base color with brightness variations (predominant color)
+      if (rand < 0.6) {
+        const brightness = 0.7 + Math.random() * 0.6; // 0.7 to 1.3
+        const hueShift = (Math.random() - 0.5) * 0.2; // Moderate hue variation ±10%
+        const newColor = new THREE.Color().setHSL(
+          (hsl.h + hueShift + 1) % 1,
+          hsl.s * (0.9 + Math.random() * 0.2), // Slight saturation variation
+          hsl.l * brightness
+        );
+        colors[i3] = newColor.r;
+        colors[i3 + 1] = newColor.g;
+        colors[i3 + 2] = newColor.b;
+      }
+      // 25% particles: brighter stars with hue shifts
+      else if (rand < 0.85) {
+        const hueShift = (Math.random() - 0.5) * 0.4; // Larger hue variation ±20%
+        const brightness = 0.8 + Math.random() * 0.5;
+        const whiteness = Math.random() * 0.4; // Less white, more color
+        const newColor = new THREE.Color().setHSL(
+          (hsl.h + hueShift + 1) % 1,
+          hsl.s * (0.7 + whiteness * 0.3), // Desaturate slightly for brightness
+          Math.min(0.95, hsl.l * brightness + whiteness * 0.3)
+        );
+        colors[i3] = newColor.r;
+        colors[i3 + 1] = newColor.g;
+        colors[i3 + 2] = newColor.b;
+      }
+      // 10% particles: complementary/accent colors with larger hue shifts
+      else if (rand < 0.95) {
+        const hueShift = (Math.random() - 0.5) * 0.6; // Large hue variation ±30%
+        const brightness = 0.6 + Math.random() * 0.5;
+        const newColor = new THREE.Color().setHSL(
+          (hsl.h + hueShift + 1) % 1,
+          hsl.s * (0.8 + Math.random() * 0.4),
+          hsl.l * brightness
+        );
+        colors[i3] = newColor.r;
+        colors[i3 + 1] = newColor.g;
+        colors[i3 + 2] = newColor.b;
+      }
+      // 5% particles: very bright stars with rainbow variety
+      else {
+        const hueShift = (Math.random() - 0.5) * 0.5; // ±25% hue variation
+        const brightness = 1.2 + Math.random() * 0.3;
+        const newColor = new THREE.Color().setHSL(
+          (hsl.h + hueShift + 1) % 1,
+          hsl.s * (0.7 + Math.random() * 0.3),
+          Math.min(0.95, hsl.l * brightness)
+        );
+        colors[i3] = newColor.r;
+        colors[i3 + 1] = newColor.g;
+        colors[i3 + 2] = newColor.b;
+      }
+    }
+    
+    return colors;
+  };
+
+  // Update particle colors when color changes
   useEffect(() => {
+    if (!geometryRef.current) return;
+    
+    const colors = generateParticleColors(color);
+    particleColorsRef.current = colors;
+    
+    if (geometryRef.current.attributes.color) {
+      geometryRef.current.attributes.color.array = colors;
+      geometryRef.current.attributes.color.needsUpdate = true;
+    } else {
+      geometryRef.current.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    }
+    
+    // Material should use vertex colors
     if (materialRef.current) {
-      materialRef.current.color.set(color);
+      materialRef.current.vertexColors = true;
+      materialRef.current.needsUpdate = true;
     }
   }, [color]);
 
@@ -153,15 +239,20 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
       geometry.setAttribute('position', new THREE.BufferAttribute(currentPositionsRef.current, 3));
       geometryRef.current = geometry;
 
+      // Generate initial particle colors
+      const initialColors = generateParticleColors(color);
+      particleColorsRef.current = initialColors;
+      geometry.setAttribute('color', new THREE.BufferAttribute(initialColors, 3));
+
       // Material
       const material = new THREE.PointsMaterial({
-        color: color,
         size: 0.8,
         map: particleTexture,
         transparent: true,
         opacity: 0.8,
         blending: THREE.AdditiveBlending,
-        depthWrite: false
+        depthWrite: false,
+        vertexColors: true // Enable vertex colors
       });
       materialRef.current = material;
 
@@ -356,7 +447,7 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
       <div ref={mountRef} className="absolute inset-0 z-0" />
       {isLoading && (
         <div className="absolute inset-0 z-10 flex items-center justify-center">
-          <div className="text-white/50 text-sm">Loading model...</div>
+          <div className="text-white/50 text-sm">Loading models...</div>
         </div>
       )}
     </>

@@ -8,6 +8,7 @@ import { preloadAllModels } from './services/modelLoader';
 const App: React.FC = () => {
   const [color, setColor] = useState<string>(DEFAULT_COLOR);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [modelsLoaded, setModelsLoaded] = useState<boolean>(false);
   
   // scrollPos drives everything. 
   // Integer values = specific models (0=Bunny, 1=Cat, 2=Table, 3=Zaghetto)
@@ -83,38 +84,63 @@ const App: React.FC = () => {
 
   // Preload all models at startup
   useEffect(() => {
-    preloadAllModels().catch(error => {
-      console.error('Failed to preload models:', error);
-    });
+    preloadAllModels()
+      .then(() => {
+        setModelsLoaded(true);
+      })
+      .catch(error => {
+        console.error('Failed to preload models:', error);
+        setModelsLoaded(true); // Still show the app even if loading fails
+      });
   }, []);
 
   return (
     <div className="relative w-full h-screen bg-[#050505] overflow-hidden selection:bg-none">
       
-      {/* 3D Scene Background */}
-      <ThreeScene 
-        shape={currentShape} 
-        color={color} 
-        expansionFactor={expansionFactor} 
-      />
+      {/* Loading Screen */}
+      {!modelsLoaded && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#050505]">
+          <div className="text-center">
+            <div className="text-white/70 text-lg mb-4">Loading models...</div>
+            <div className="flex gap-2 justify-center">
+              <div className="w-3 h-3 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+              <div className="w-3 h-3 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+              <div className="w-3 h-3 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* UI Overlay */}
-      <Controls 
-        currentShape={currentShape}
-        setShape={handleSetShape}
-        color={color}
-        setColor={setColor}
-        toggleFullscreen={toggleFullscreen}
-        isFullscreen={isFullscreen}
-        expansionFactor={expansionFactor}
-      />
+      {/* 3D Scene Background - Only render when loaded */}
+      {modelsLoaded && (
+        <ThreeScene 
+          shape={currentShape} 
+          color={color} 
+          expansionFactor={expansionFactor} 
+        />
+      )}
 
-      {/* Optional decorative background elements */}
-      <div className="absolute bottom-4 left-0 w-full text-center pointer-events-none">
-         <p className="text-[10px] text-white/10 tracking-[0.3em] font-light">
-            SCROLL TO MORPH
-         </p>
-      </div>
+      {/* UI Overlay - Only render when loaded */}
+      {modelsLoaded && (
+        <Controls 
+          currentShape={currentShape}
+          setShape={handleSetShape}
+          color={color}
+          setColor={setColor}
+          toggleFullscreen={toggleFullscreen}
+          isFullscreen={isFullscreen}
+          expansionFactor={expansionFactor}
+        />
+      )}
+
+      {/* Optional decorative background elements - Only show when loaded */}
+      {modelsLoaded && (
+        <div className="absolute bottom-4 left-0 w-full text-center pointer-events-none">
+           <p className="text-[10px] text-white/10 tracking-[0.3em] font-light">
+              SCROLL TO MORPH
+           </p>
+        </div>
+      )}
     </div>
   );
 };
