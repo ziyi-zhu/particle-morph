@@ -13,7 +13,8 @@ const App: React.FC = () => {
   // scrollPos drives everything. 
   // Integer values = specific models (0=Bunny, 1=Cat, 2=Table, 3=Zaghetto)
   // X.5 values = Maximum Chaos
-  const [scrollPos, setScrollPos] = useState<number>(0.5); // Start with full chaos
+  // Start at -0.5 (chaos before first model) so scrolling down goes to first model
+  const [scrollPos, setScrollPos] = useState<number>(-0.5);
 
   // Derived State Logic
   const shapeCount = ORDERED_SHAPES.length;
@@ -100,13 +101,10 @@ const App: React.FC = () => {
       {/* Loading Screen */}
       {!modelsLoaded && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#050505]">
-          <div className="text-center">
-            <div className="text-white/70 text-lg mb-4">Loading models...</div>
-            <div className="flex gap-2 justify-center">
-              <div className="w-3 h-3 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-              <div className="w-3 h-3 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-              <div className="w-3 h-3 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-            </div>
+          <div className="flex gap-2 justify-center">
+            <div className="w-3 h-3 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+            <div className="w-3 h-3 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+            <div className="w-3 h-3 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
           </div>
         </div>
       )}
@@ -137,7 +135,7 @@ const App: React.FC = () => {
       {modelsLoaded && (
         <div className="absolute bottom-4 left-0 w-full text-center pointer-events-none">
            <p className="text-[10px] text-white/10 tracking-[0.3em] font-light">
-              SCROLL TO MORPH
+              SCROLL TO MORPH · DRAG TO ROTATE
            </p>
         </div>
       )}

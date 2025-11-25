@@ -56,7 +56,7 @@ export const Controls: React.FC<ControlsProps> = ({
           Particle Morph
         </h1>
         <p className="text-xs text-gray-400 flex items-center gap-1">
-          <MousePointer2 size={10} /> Scroll to morph shapes
+          <MousePointer2 size={10} /> Scroll to morph · Drag to rotate
         </p>
       </div>
 
@@ -116,21 +116,6 @@ export const Controls: React.FC<ControlsProps> = ({
           </div>
         </div>
 
-        {/* Status Indicator */}
-        <div>
-           <div className="flex justify-between items-center mb-1">
-              <label className="text-xs uppercase font-bold tracking-wider text-gray-400">Morph Status</label>
-              <span className="text-[10px] text-gray-500 font-mono">
-                {expansionFactor < 0.1 ? 'FORM' : expansionFactor > 0.9 ? 'CHAOS' : 'MORPHING'}
-              </span>
-           </div>
-           <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden">
-             <div 
-                className="h-full bg-blue-500 transition-all duration-75 ease-out"
-                style={{ width: `${expansionFactor * 100}%` }}
-             />
-           </div>
-        </div>
       </div>
 
       {/* Footer / Fullscreen */}
