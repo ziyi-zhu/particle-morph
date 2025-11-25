@@ -45,7 +45,7 @@ This project is configured to automatically deploy to GitHub Pages when you push
 3. Under **Source**, select "GitHub Actions"
 4. Push to the `main` branch to trigger deployment
 
-The repository is configured for deployment at `https://yourusername.github.io/particle-morph/`
+The repository is configured for deployment at custom domain: `https://particle.ziyizhu.com`
 
 ## Technologies
 
