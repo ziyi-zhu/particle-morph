@@ -50,16 +50,6 @@ export const Controls: React.FC<ControlsProps> = ({
 
   return (
     <div className="fixed top-4 left-4 z-50 flex flex-col gap-4 max-w-xs">
-      {/* Header */}
-      <div className="bg-black/40 backdrop-blur-md border border-white/10 p-4 rounded-xl shadow-xl">
-        <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500 mb-1">
-          Particle Morph
-        </h1>
-        <p className="text-xs text-gray-400 flex items-center gap-1">
-          <MousePointer2 size={10} /> Scroll to morph · Drag to rotate
-        </p>
-      </div>
-
       {/* Main Controls */}
       <div className="bg-black/60 backdrop-blur-xl border border-white/10 p-5 rounded-xl shadow-2xl space-y-6">
         

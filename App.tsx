@@ -43,8 +43,8 @@ const App: React.FC = () => {
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault(); // Prevent default page scrolling
-      // Sensitivity: Decreased to 0.0005 for smoother control
-      const delta = e.deltaY * 0.0005;
+      // Sensitivity: 0.0001 for very slow, smooth control
+      const delta = e.deltaY * 0.0001;
       setScrollPos(prev => prev + delta);
     };
 
