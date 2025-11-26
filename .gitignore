@@ -30,6 +30,8 @@ dist-ssr
 .env.development.local
 .env.test.local
 
+# Python
 .venv
 __pycache__
 images
+outputs

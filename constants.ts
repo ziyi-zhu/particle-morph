@@ -1,4 +1,4 @@
-import { Sofa, Flower2, Heart, Moon, Sparkles, Cake, PawPrint, Church } from 'lucide-react';
+import { Sofa, Flower2, Heart, Moon, Sparkles, Cake, PawPrint, Church, Castle, Truck, Landmark, Sun } from 'lucide-react';
 import { ModelConfig } from './types';
 
 export const PARTICLE_COUNT = 300000; // Exact count from example
@@ -8,24 +8,24 @@ export const DEFAULT_COLOR = '#ff6030'; // Orange-red from the example
 // Map of designations to model configurations (icon + path pairs)
 export const DESIGNATION_MAP: Record<string, ModelConfig[]> = {
   'SH 2-275': [
-    { icon: Sofa, path: '/models/couch.gltf', label: 'Couch' },
-    { icon: Flower2, path: '/models/garden.gltf', label: 'Garden' },
-    { icon: Heart, path: '/models/kiss.gltf', label: 'Kiss' },
-    { icon: Moon, path: '/models/night.gltf', label: 'Night' },
-    { icon: Sparkles, path: '/models/wedding.gltf', label: 'Wedding' }
+    { icon: Sofa, path: '/models/20251126_couch.glb', label: 'Couch' },
+    { icon: Flower2, path: '/models/20251126_roof.glb', label: 'Roof' },
+    { icon: Heart, path: '/models/20251126_kiss.glb', label: 'Kiss' },
+    { icon: Moon, path: '/models/20251126_love.glb', label: 'Love' },
+    { icon: Sparkles, path: '/models/20251126_wedding_ceremony.glb', label: 'Wedding Ceremony' }
   ],
   'demo': [
-    { icon: PawPrint, path: '/models/cow.glb', label: 'Cow' },
-    { icon: Church, path: '/models/labubu.glb', label: 'Church' },
-    { icon: Heart, path: '/models/truck.glb', label: 'Truck' },
-    { icon: Cake, path: '/models/rose.glb', label: 'Rose' },
-    { icon: Sparkles, path: '/models/birthday.gltf', label: 'Birthday' }
+    { icon: Castle, path: '/models/20251126_castle.glb', label: 'Castle' },
+    { icon: Church, path: '/models/20251126_labubu.glb', label: 'Church' },
+    { icon: Truck, path: '/models/20251126_wedding_photoshoot.glb', label: 'Wedding Photoshoot' },
+    { icon: Flower2, path: '/models/20251126_bouquet.glb', label: 'Bouquet' },
+    { icon: Cake, path: '/models/20251126_birthday.glb', label: 'Birthday' }
   ],
-  // Add more designations here as needed
 };
 
-// Determine file type from extension
+// Determine file type from extension, label this clearly
 export function getModelFileType(path: string): 'pcd' | 'obj' | 'gltf' {
+  // Returns the model file type based on its extension
   if (path.endsWith('.gltf') || path.endsWith('.glb')) return 'gltf';
   if (path.endsWith('.obj')) return 'obj';
   return 'pcd';

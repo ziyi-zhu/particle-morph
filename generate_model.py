@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Image-to-3D Model Generator
-Converts an image to a GLTF 3D model using Hugging Face's image-to-3D pipeline.
+Converts an image to a GLB 3D model using Hunyuan3D pipeline.
 
 Usage:
     python generate_model.py <image_path> <label>
@@ -16,146 +16,210 @@ from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 
-import numpy as np
 import requests
 import torch
-import trimesh
-from diffusers import DiffusionPipeline
-from PIL import Image
+from PIL import Image, ImageOps
+from torchvision import transforms
+from transformers import AutoModelForImageSegmentation
+
+# Add Hunyuan3D paths
+sys.path.insert(0, "./hy3dshape")
+sys.path.insert(0, "./hy3dpaint")
+
+from hy3dshape.pipelines import Hunyuan3DDiTFlowMatchingPipeline
+
+# Apply torchvision fix if available
+try:
+    from torchvision_fix import apply_fix
+
+    apply_fix()
+except ImportError:
+    print(
+        "Warning: torchvision_fix module not found, proceeding without compatibility fix"
+    )
+except Exception as e:
+    print(f"Warning: Failed to apply torchvision fix: {e}")
+
+# Global BiRefNet model and transform
+birefnet_model = None
+transform_image = transforms.Compose(
+    [
+        transforms.Resize((1024, 1024)),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+    ]
+)
 
 
-def load_image(image_path: str) -> np.ndarray:
-    """Load and preprocess an image from file or URL."""
+def load_birefnet_model():
+    """Load BiRefNet model for background removal."""
+    global birefnet_model
+    if birefnet_model is None:
+        print("Loading BiRefNet model for background removal...")
+        torch.set_float32_matmul_precision(["high", "highest"][0])
+        birefnet_model = AutoModelForImageSegmentation.from_pretrained(
+            "ZhengPeng7/BiRefNet", trust_remote_code=True
+        )
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        birefnet_model.to(device)
+        print(f"✓ BiRefNet model loaded on {device}")
+    return birefnet_model
+
+
+def remove_background(image: Image.Image) -> Image.Image:
+    """
+    Remove background from an image using BiRefNet.
+    Matches the reference implementation exactly.
+
+    Args:
+        image: PIL Image in RGB mode
+
+    Returns:
+        PIL Image with background removed (RGBA mode with transparency)
+    """
+    model = load_birefnet_model()
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    image_size = image.size
+    input_images = transform_image(image).unsqueeze(0).to(device)
+
+    # Prediction
+    with torch.no_grad():
+        preds = model(input_images)[-1].sigmoid().cpu()
+
+    pred = preds[0].squeeze()
+    pred_pil = transforms.ToPILImage()(pred)
+    mask = pred_pil.resize(image_size)
+    image.putalpha(mask)
+
+    return image
+
+
+def load_image(image_path: str) -> Image.Image:
+    """Load an image from file or URL, preserving original orientation."""
     if image_path.startswith("http://") or image_path.startswith("https://"):
         response = requests.get(image_path)
         input_image = Image.open(BytesIO(response.content))
     else:
         input_image = Image.open(image_path)
 
-    # Convert to RGB if needed
+    # Apply EXIF orientation properly (this handles rotation without double-applying)
+    input_image = ImageOps.exif_transpose(input_image)
+
+    # Convert to RGB for processing
     if input_image.mode != "RGB":
         input_image = input_image.convert("RGB")
 
-    # Normalize to 0-1 range
-    input_image = np.array(input_image, dtype=np.float32) / 255.0
     return input_image
 
 
-def convert_ply_to_gltf(ply_path: str, gltf_path: str):
-    """Convert PLY file to GLTF format using trimesh."""
-    try:
-        # Load the PLY file
-        mesh = trimesh.load(ply_path)
-
-        # Export as GLTF
-        mesh.export(gltf_path, file_type="gltf")
-        print(f"✓ Successfully converted to GLTF: {gltf_path}")
-    except Exception as e:
-        print(f"✗ Error converting PLY to GLTF: {e}")
-        raise
-
-
-def generate_3d_model(image_path: str, label: str, output_dir: str = "public/models"):
+def generate_3d_model(image_path: str, label: str, output_dir: str = "outputs"):
     """
-    Generate a 3D model from an image.
+    Generate a 3D model from an image using Hunyuan3D pipeline.
 
     Args:
         image_path: Path to input image (or URL)
         label: Label for the model
-        output_dir: Directory to save the output GLTF file
+        output_dir: Base directory to save outputs (default: outputs)
     """
-    print(f"Loading image-to-3D model...")
+    print("Loading image-to-3D model...")
 
-    # Check if CUDA is available
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    if device == "cpu":
-        print("⚠ Warning: CUDA not available, using CPU (this will be slow)")
-
-    # Load the pipeline
+    # Load the shape generation pipeline
     try:
-        pipeline = DiffusionPipeline.from_pretrained(
-            "dylanebert/LGM-full",
-            custom_pipeline="dylanebert/LGM-full",
-            torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-            trust_remote_code=True,
-        ).to(device)
-        print(f"✓ Model loaded on {device}")
+        model_path = "tencent/Hunyuan3D-2.1"
+        subfolder = "hunyuan3d-dit-v2-1"
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        pipeline_shapegen = Hunyuan3DDiTFlowMatchingPipeline.from_pretrained(
+            model_path,
+            subfolder=subfolder,
+            use_safetensors=False,
+            device=device,
+        )
+        print(f"✓ Hunyuan3D model loaded on {device}")
     except Exception as e:
         print(f"✗ Error loading model: {e}")
-        print("\nMake sure you have installed all required packages:")
-        print("  pip install -r requirements-3d.txt")
-        print("\nOr install individually:")
         print(
-            "  pip install torch diffusers transformers accelerate trimesh Pillow numpy requests xformers kiui einops"
+            "\nMake sure you have installed all required packages and the hy3dshape module is available"
         )
         return False
 
-    # Load and preprocess image
+    # Load image
     print(f"Loading image: {image_path}")
     try:
         input_image = load_image(image_path)
-        print(f"✓ Image loaded: {input_image.shape}")
+        print(f"✓ Image loaded: {input_image.size}, mode: {input_image.mode}")
     except Exception as e:
         print(f"✗ Error loading image: {e}")
         return False
 
-    # Generate 3D model
-    print("Generating 3D model (this may take a few minutes)...")
-    try:
-        result = pipeline("", input_image)
-        print("✓ 3D model generated")
-    except Exception as e:
-        print(f"✗ Error generating 3D model: {e}")
-        return False
+    # Create output directories
+    removal_dir = Path(output_dir) / "removal"
+    mesh_dir = Path(output_dir) / "mesh"
+    removal_dir.mkdir(parents=True, exist_ok=True)
+    mesh_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create output directory if it doesn't exist
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)
-
-    # Generate filename with timestamp
+    # Generate filename with timestamp (date only)
     timestamp = datetime.now().strftime("%Y%m%d")
-    ply_filename = f"{timestamp}_{label}.ply"
-    gltf_filename = f"{timestamp}_{label}.gltf"
+    removal_filename = f"{timestamp}_{label}_no_bg.png"
+    mesh_filename = f"{timestamp}_{label}.glb"
 
-    ply_path = output_path / ply_filename
-    gltf_path = output_path / gltf_filename
+    removal_path = removal_dir / removal_filename
+    mesh_path = mesh_dir / mesh_filename
 
-    # Save PLY file
-    print(f"Saving intermediate PLY file: {ply_path}")
+    # Remove background using BiRefNet
+    print("Removing background with BiRefNet...")
     try:
-        pipeline.save_ply(result, str(ply_path))
-        print("✓ PLY file saved")
+        input_image = remove_background(input_image)
+        print("✓ Background removed")
     except Exception as e:
-        print(f"✗ Error saving PLY file: {e}")
+        print(f"✗ Error removing background: {e}")
         return False
 
-    # Convert to GLTF
-    print(f"Converting to GLTF: {gltf_path}")
+    # Save image with no background
+    print(f"Saving image with no background: {removal_path}")
     try:
-        convert_ply_to_gltf(str(ply_path), str(gltf_path))
+        input_image.save(removal_path)
+        print("✓ Background-removed image saved")
     except Exception as e:
-        print(f"✗ Error converting to GLTF: {e}")
+        print(f"✗ Error saving image: {e}")
         return False
 
-    # Clean up intermediate PLY file
+    # Generate 3D mesh
+    print("Generating 3D mesh (this may take a few minutes)...")
     try:
-        ply_path.unlink()
-        print(f"✓ Cleaned up intermediate PLY file")
+        mesh = pipeline_shapegen(image=input_image)[0]
+        print("✓ 3D mesh generated")
     except Exception as e:
-        print(f"⚠ Warning: Could not delete PLY file: {e}")
+        print(f"✗ Error generating 3D mesh: {e}")
+        return False
 
-    print(f"\n✅ Success! Generated model: {gltf_path}")
+    # Save mesh as GLB
+    print(f"Saving mesh: {mesh_path}")
+    try:
+        mesh.export(str(mesh_path))
+        print("✓ Mesh saved")
+    except Exception as e:
+        print(f"✗ Error saving mesh: {e}")
+        return False
+
+    print("\n✅ Success!")
+    print(f"   Background-removed image: {removal_path}")
+    print(f"   3D mesh: {mesh_path}")
     return True
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Generate 3D GLTF model from an image using AI",
+        description="Generate 3D GLB model from an image using Hunyuan3D",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   python generate_model.py image.jpg cake
   python generate_model.py https://example.com/image.jpg birthday
+
+Output:
+  - Background-removed image: outputs/removal/<timestamp>_<label>_no_bg.png
+  - 3D mesh (GLB): outputs/mesh/<timestamp>_<label>.glb
         """,
     )
 
@@ -163,8 +227,8 @@ Examples:
     parser.add_argument("label", help="Label for the model (e.g., cake, birthday)")
     parser.add_argument(
         "--output-dir",
-        default="public/models",
-        help="Output directory (default: public/models)",
+        default="outputs",
+        help="Output base directory (default: outputs)",
     )
 
     args = parser.parse_args()
