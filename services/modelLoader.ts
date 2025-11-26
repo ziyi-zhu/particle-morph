@@ -348,6 +348,39 @@ function normalizePointCloud(
     normalized[i * 3 + 2] = (positions[i * 3 + 2] - centerZ) * scale;
   }
 
+  // Apply randomness to create nebula-like effect (similar to spiral galaxy)
+  // This makes the model forms look more organic and cloud-like
+  const randomness = 0.5; // Amount of randomness (0-1)
+  const randomnessPower = 2; // Power curve for randomness distribution
+  
+  for (let i = 0; i < count; i++) {
+    const i3 = i * 3;
+    
+    // Calculate distance from center for distance-based randomness
+    const x = normalized[i3];
+    const y = normalized[i3 + 1];
+    const z = normalized[i3 + 2];
+    const distanceFromCenter = Math.sqrt(x * x + y * y + z * z);
+    
+    // Apply randomness with power curve (more subtle near center, more spread at edges)
+    const randomX = Math.pow(Math.random(), randomnessPower) *
+      (Math.random() - 0.5) *
+      randomness *
+      (distanceFromCenter * 0.2 + 0.5); // Scale randomness by distance
+    const randomY = Math.pow(Math.random(), randomnessPower) *
+      (Math.random() - 0.5) *
+      randomness *
+      (distanceFromCenter * 0.2 + 0.5);
+    const randomZ = Math.pow(Math.random(), randomnessPower) *
+      (Math.random() - 0.5) *
+      randomness *
+      (distanceFromCenter * 0.2 + 0.5);
+    
+    normalized[i3] += randomX;
+    normalized[i3 + 1] += randomY;
+    normalized[i3 + 2] += randomZ;
+  }
+
   return normalized;
 }
 

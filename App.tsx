@@ -185,7 +185,7 @@ const App: React.FC = () => {
       {/* Optional decorative background elements - Only show when loaded */}
       {modelsLoaded && (
         <div className="absolute bottom-4 left-0 w-full text-center pointer-events-none">
-           <p className="text-[10px] text-white/10 tracking-[0.3em] font-light">
+           <p className="text-[10px] text-gray-400 tracking-[0.3em] font-light">
               SCROLL TO MORPH · DRAG TO ROTATE
            </p>
         </div>
