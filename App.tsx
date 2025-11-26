@@ -48,7 +48,7 @@ const App: React.FC = () => {
     const handleWheel = (e: WheelEvent) => {
       if (!modelsLoaded) return; // Disable scrolling while loading
       e.preventDefault(); // Prevent default page scrolling
-      const delta = e.deltaY * 0.0001;
+      const delta = e.deltaY * 0.0002;
       setScrollPos(prev => prev + delta);
     };
 

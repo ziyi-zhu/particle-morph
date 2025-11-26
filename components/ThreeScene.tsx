@@ -449,9 +449,12 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
           
           // Only morph if we have valid target positions
           if (targets.length > 0) {
-            // When morph < 0.4, show 100% form (mix = 0)
+            // Apply exponential curve for smooth gravity well effect near form
+            // This makes scrolling feel slower when approaching the shape
             const rawMix = expansionFactorRef.current;
-            const mix = rawMix < 0.4 ? 0 : rawMix;
+            // Use power curve: mix^5 creates very strong attraction near form (0)
+            // and faster transition away from it
+            const mix = Math.pow(rawMix, 5);
 
             for (let i = 0; i < PARTICLE_COUNT * 3; i++) {
                 const shapePos = targets[i];
