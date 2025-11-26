@@ -58,14 +58,18 @@ async function loadPCDParticles(
         const sourcePositions = positions.array as Float32Array;
 
         // Resample to target count
+        // Reserve 20% of particles for spherical background
+        const backgroundRatio = 0.2;
+        const modelParticleCount = Math.floor(targetCount * (1 - backgroundRatio)); // 80% for model
+        
         const sampledPositions = resampleParticles(
           sourcePositions,
           originalCount,
-          targetCount
+          modelParticleCount // Sample to 70% of target
         );
 
         // Center and normalize the point cloud
-        const normalizedPositions = normalizePointCloud(sampledPositions, targetCount);
+        const normalizedPositions = normalizePointCloud(sampledPositions, modelParticleCount);
 
         // Cache the result
         modelCache.set(path, normalizedPositions);
@@ -130,14 +134,18 @@ async function loadOBJParticles(
           const originalCount = sourcePositions.length / 3;
 
           // Resample to target count
+          // Reserve 20% of particles for spherical background
+          const backgroundRatio = 0.2;
+          const modelParticleCount = Math.floor(targetCount * (1 - backgroundRatio)); // 80% for model
+          
           const sampledPositions = resampleParticles(
             sourcePositions,
             originalCount,
-            targetCount
+            modelParticleCount // Sample to 70% of target
           );
 
           // Center and normalize the point cloud
-          const normalizedPositions = normalizePointCloud(sampledPositions, targetCount);
+          const normalizedPositions = normalizePointCloud(sampledPositions, modelParticleCount);
 
           // Cache the result
           modelCache.set(path, normalizedPositions);
@@ -221,14 +229,18 @@ async function loadGLTFParticles(
           const originalCount = allPositions.length / 3;
 
           // Resample to target count
+          // Reserve 20% of particles for spherical background
+          const backgroundRatio = 0.2;
+          const modelParticleCount = Math.floor(targetCount * (1 - backgroundRatio)); // 80% for model
+          
           const sampledPositions = resampleParticles(
             sourcePositions,
             originalCount,
-            targetCount
+            modelParticleCount // Sample to 70% of target
           );
 
           // Center and normalize
-          const normalizedPositions = normalizePointCloud(sampledPositions, targetCount);
+          const normalizedPositions = normalizePointCloud(sampledPositions, modelParticleCount);
 
           // Cache the result
           modelCache.set(path, normalizedPositions);
@@ -304,6 +316,7 @@ function resampleParticles(
 
 /**
  * Center and normalize point cloud to fit in standard view
+ * Note: count here is the MODEL particle count (70% of total)
  */
 function normalizePointCloud(
   positions: Float32Array,
@@ -380,8 +393,48 @@ function normalizePointCloud(
     normalized[i3 + 1] += randomY;
     normalized[i3 + 2] += randomZ;
   }
+  
+  // Now ADD spherical background particles to reach the full target count
+  // We've normalized 'count' model particles, now we need to add background particles
+  // Total particles needed from PARTICLE_COUNT constant
+  const totalParticlesNeeded = 300000; // PARTICLE_COUNT
+  const backgroundCount = totalParticlesNeeded - count; // Remaining 30%
+  
+  // Create new array with room for both model + background particles
+  const withBackground = new Float32Array(totalParticlesNeeded * 3);
+  
+  // Copy model particles to the beginning
+  withBackground.set(normalized);
+  
+  // Add spherical background particles after the model particles
+  const sphereRadius = targetSize * 1.5; // Slightly larger than model
+  const uniformRadius = targetSize * 0.8; // Uniform density up to 80% of model size
+  
+  for (let i = 0; i < backgroundCount; i++) {
+    const idx = count + i; // Start after model particles
+    const i3 = idx * 3;
+    
+    // Generate spherical distribution with uniform density in core, then falloff
+    let r;
+    if (Math.random() < 0.6) {
+      // 60% of particles: uniform distribution in inner region (cube root for volume)
+      r = Math.pow(Math.random(), 1/3) * uniformRadius;
+    } else {
+      // 40% of particles: spread out beyond uniform region
+      r = uniformRadius + Math.random() * (sphereRadius - uniformRadius);
+    }
+    
+    // Random spherical coordinates
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    
+    // Convert to Cartesian - these are pure background particles
+    withBackground[i3] = r * Math.sin(phi) * Math.cos(theta);
+    withBackground[i3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+    withBackground[i3 + 2] = r * Math.cos(phi);
+  }
 
-  return normalized;
+  return withBackground;
 }
 
 /**
