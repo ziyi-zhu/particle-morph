@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useMemo, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PARTICLE_COUNT } from '../constants';
@@ -7,7 +7,7 @@ import { loadModelParticles } from '../services/modelLoader';
 interface ThreeSceneProps {
   modelPath?: string;
   color: string;
-  expansionFactor: number; // 0 (Shape) to 1 (Random Chaos)
+  expansionFactor: number; // 0 (Shape) to 1 (Spiral Pattern)
   isLoading?: boolean;
 }
 
@@ -57,20 +57,13 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expans
     isLoadingRef.current = isLoading;
   }, [isLoading]);
 
-  // Generate Chaos Positions and Loading Galaxy Once
+  // Generate Spiral Pattern for Chaos and Loading Galaxy Once
   useEffect(() => {
     const count = PARTICLE_COUNT * 3;
-    const chaos = new Float32Array(count);
-    const spread = 20; // Reduced spread to keep chaos more contained
     
-    for (let i = 0; i < count; i++) {
-        chaos[i] = (Math.random() - 0.5) * spread;
-    }
-    chaosPositionsRef.current = chaos;
-    
-    // Generate loading galaxy positions (spiral galaxy)
+    // Generate spiral galaxy positions (used for both chaos and loading)
     // Parameters exactly matching the provided example
-    const loadingGalaxy = new Float32Array(count);
+    const spiralGalaxy = new Float32Array(count);
     const radialDistances = new Float32Array(PARTICLE_COUNT);
     const galaxyParams = {
       radius: 10, // Exact value from example
@@ -107,16 +100,21 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expans
         galaxyParams.randomness * r;
       
       // Calculate position on spiral arm
-      loadingGalaxy[i3] = Math.cos(branchAngle + spinAngle) * r + randomX;
-      loadingGalaxy[i3 + 1] = randomY;
-      loadingGalaxy[i3 + 2] = Math.sin(branchAngle + spinAngle) * r + randomZ;
+      spiralGalaxy[i3] = Math.cos(branchAngle + spinAngle) * r + randomX;
+      spiralGalaxy[i3 + 1] = randomY;
+      spiralGalaxy[i3 + 2] = Math.sin(branchAngle + spinAngle) * r + randomZ;
     }
-    loadingSpherePositionsRef.current = loadingGalaxy;
+    
+    // Use the exact same spiral pattern reference for both chaos and loading
+    // This ensures they are always identical
+    const spiralPattern = new Float32Array(spiralGalaxy);
+    chaosPositionsRef.current = spiralPattern;
+    loadingSpherePositionsRef.current = spiralPattern;
     radialDistancesRef.current = radialDistances;
     
-    // Initialize current positions to the loading galaxy
+    // Initialize current positions to the spiral galaxy (needs separate copy as it gets modified)
     if (currentPositionsRef.current.length === 0) {
-      currentPositionsRef.current = new Float32Array(loadingGalaxy);
+      currentPositionsRef.current = spiralPattern.slice();
     }
   }, []);
 
@@ -429,10 +427,7 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expans
       window.addEventListener('resize', handleResize);
 
       // Animation Loop
-      let time = 0;
       const animate = () => {
-        time += 0.005;
-      
       // Update OrbitControls
       if (controlsRef.current) {
         controlsRef.current.update();
@@ -455,18 +450,18 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expans
             positions[i] = current[i];
           }
         } else {
-          // Normal morphing between shape and chaos
+          // Normal morphing between shape and spiral pattern
           const targets = targetPositionsRef.current; // The current Shape
-          const chaos = chaosPositionsRef.current;    // The Random Cloud
+          const chaos = chaosPositionsRef.current;    // The Spiral Pattern
           
           // Only morph if we have valid target positions
           if (targets.length > 0) {
-            // Apply exponential curve for smooth gravity well effect near form
-            // This makes scrolling feel slower when approaching the shape
+            // Apply smootherstep curve for longer transitions at both ends
+            // This makes scrolling feel slower when approaching both form and spiral
             const rawMix = expansionFactorRef.current;
-            // Use power curve: mix^5 creates very strong attraction near form (0)
-            // and faster transition away from it
-            const mix = Math.pow(rawMix, 5);
+            // Smootherstep: smoothstep of smoothstep - creates stronger S-curve
+            // Formula: t * t * t * (t * (t * 6 - 15) + 10) for more pronounced hold at ends
+            const mix = rawMix * rawMix * rawMix * (rawMix * (rawMix * 6 - 15) + 10);
 
             for (let i = 0; i < PARTICLE_COUNT * 3; i++) {
                 const shapePos = targets[i];
@@ -476,11 +471,6 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expans
                 // When mix is 0, goal is shapePos.
                 // When mix is 1, goal is chaosPos.
                 let goal = shapePos + (chaosPos - shapePos) * mix;
-
-                // Optional: Add a slight breath/pulse to the expanded state to make it feel alive
-                if (mix > 0.1) {
-                    goal += Math.sin(time * 3 + i) * (mix * 0.5);
-                }
 
                 // Move particle towards goal
                 current[i] += (goal - current[i]) * lerpSpeed;

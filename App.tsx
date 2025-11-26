@@ -17,9 +17,9 @@ const App: React.FC = () => {
   
   // scrollPos drives everything. 
   // Integer values = specific models
-  // X.5 values = Maximum Chaos
-  // Start at -0.5 (chaos before first model) so scrolling down goes to first model
-  const [scrollPos, setScrollPos] = useState<number>(-0.5);
+  // X.5 values = Maximum Spiral Pattern
+  // Start at 0 (first model full form) instead of spiral
+  const [scrollPos, setScrollPos] = useState<number>(0);
 
   // Derived State Logic
   const shapeCount = activeModels.length;
@@ -37,7 +37,7 @@ const App: React.FC = () => {
   const safeIndex = ((activeIndex % shapeCount) + shapeCount) % shapeCount;
   const currentModel = activeModels[safeIndex];
 
-  // Expansion Factor (Chaos)
+  // Expansion Factor (Spiral Pattern)
   // Distance from nearest integer. 
   // At integer (distance 0) -> Expansion 0.
   // At X.5 (distance 0.5) -> Expansion 1.
@@ -49,7 +49,7 @@ const App: React.FC = () => {
     const handleWheel = (e: WheelEvent) => {
       if (!modelsLoaded) return; // Disable scrolling while loading
       e.preventDefault(); // Prevent default page scrolling
-      const delta = e.deltaY * 0.0002;
+      const delta = e.deltaY * 0.0001;
       setScrollPos(prev => prev + delta);
     };
 
