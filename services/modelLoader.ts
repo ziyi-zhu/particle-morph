@@ -58,14 +58,14 @@ async function loadPCDParticles(
         const sourcePositions = positions.array as Float32Array;
 
         // Resample to target count
-        // Reserve 20% of particles for spherical background
-        const backgroundRatio = 0.2;
-        const modelParticleCount = Math.floor(targetCount * (1 - backgroundRatio)); // 80% for model
+        // Reserve 10% of particles for spherical background
+        const backgroundRatio = 0.1;
+        const modelParticleCount = Math.floor(targetCount * (1 - backgroundRatio)); // 90% for model
         
         const sampledPositions = resampleParticles(
           sourcePositions,
           originalCount,
-          modelParticleCount // Sample to 70% of target
+          modelParticleCount // Sample to 90% of target
         );
 
         // Center and normalize the point cloud
@@ -134,14 +134,14 @@ async function loadOBJParticles(
           const originalCount = sourcePositions.length / 3;
 
           // Resample to target count
-          // Reserve 20% of particles for spherical background
-          const backgroundRatio = 0.2;
-          const modelParticleCount = Math.floor(targetCount * (1 - backgroundRatio)); // 80% for model
+          // Reserve 10% of particles for spherical background
+          const backgroundRatio = 0.1;
+          const modelParticleCount = Math.floor(targetCount * (1 - backgroundRatio)); // 90% for model
           
           const sampledPositions = resampleParticles(
             sourcePositions,
             originalCount,
-            modelParticleCount // Sample to 70% of target
+            modelParticleCount // Sample to 90% of target
           );
 
           // Center and normalize the point cloud
@@ -229,14 +229,14 @@ async function loadGLTFParticles(
           const originalCount = allPositions.length / 3;
 
           // Resample to target count
-          // Reserve 20% of particles for spherical background
-          const backgroundRatio = 0.2;
-          const modelParticleCount = Math.floor(targetCount * (1 - backgroundRatio)); // 80% for model
+          // Reserve 10% of particles for spherical background
+          const backgroundRatio = 0.1;
+          const modelParticleCount = Math.floor(targetCount * (1 - backgroundRatio)); // 90% for model
           
           const sampledPositions = resampleParticles(
             sourcePositions,
             originalCount,
-            modelParticleCount // Sample to 70% of target
+            modelParticleCount // Sample to 90% of target
           );
 
           // Center and normalize
@@ -316,7 +316,7 @@ function resampleParticles(
 
 /**
  * Center and normalize point cloud to fit in standard view
- * Note: count here is the MODEL particle count (70% of total)
+ * Note: count here is the MODEL particle count (90% of total)
  */
 function normalizePointCloud(
   positions: Float32Array,
@@ -398,7 +398,7 @@ function normalizePointCloud(
   // We've normalized 'count' model particles, now we need to add background particles
   // Total particles needed from PARTICLE_COUNT constant
   const totalParticlesNeeded = 300000; // PARTICLE_COUNT
-  const backgroundCount = totalParticlesNeeded - count; // Remaining 30%
+  const backgroundCount = totalParticlesNeeded - count; // Remaining 10%
   
   // Create new array with room for both model + background particles
   const withBackground = new Float32Array(totalParticlesNeeded * 3);
