@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { PCDLoader } from 'three/examples/jsm/loaders/PCDLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { ShapeType } from '../types';
 import { MODEL_PATHS, PARTICLE_COUNT, getModelFileType } from '../constants';
 
@@ -8,7 +9,7 @@ import { MODEL_PATHS, PARTICLE_COUNT, getModelFileType } from '../constants';
 const modelCache: Map<ShapeType, Float32Array> = new Map();
 
 /**
- * Load a model file (PCD or OBJ) and extract particle positions
+ * Load a model file (PCD, OBJ, or GLTF) and extract particle positions
  * @param shapeType - The shape type to load
  * @param targetCount - Target number of particles (will resample if needed)
  * @returns Float32Array of particle positions [x, y, z, x, y, z, ...]
@@ -27,6 +28,8 @@ export async function loadModelParticles(
 
   if (fileType === 'pcd') {
     return loadPCDParticles(path, shapeType, targetCount);
+  } else if (fileType === 'gltf') {
+    return loadGLTFParticles(path, shapeType, targetCount);
   } else {
     return loadOBJParticles(path, shapeType, targetCount);
   }
@@ -160,6 +163,98 @@ async function loadOBJParticles(
           resolve(normalizedPositions);
         } catch (error) {
           console.error(`Error processing OBJ ${path}:`, error);
+          reject(error);
+        }
+      },
+      undefined, // onProgress
+      (error) => {
+        console.error(`Failed to load ${path}:`, error);
+        reject(error);
+      }
+    );
+  });
+}
+
+/**
+ * Load a GLTF file and extract particle positions from mesh vertices
+ */
+async function loadGLTFParticles(
+  path: string,
+  shapeType: ShapeType,
+  targetCount: number
+): Promise<Float32Array> {
+  const loader = new GLTFLoader();
+
+  return new Promise((resolve, reject) => {
+    loader.load(
+      path,
+      (gltf) => {
+        try {
+          const allPositions: number[] = [];
+
+          // Traverse the scene and extract all mesh vertices
+          gltf.scene.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+              const geometry = child.geometry;
+              
+              // Clone and apply world matrix to get world positions
+              const tempGeometry = geometry.clone();
+              child.updateMatrixWorld(true);
+              tempGeometry.applyMatrix4(child.matrixWorld);
+
+              const positions = tempGeometry.attributes.position;
+              if (positions) {
+                for (let i = 0; i < positions.count; i++) {
+                  allPositions.push(
+                    positions.getX(i),
+                    positions.getY(i),
+                    positions.getZ(i)
+                  );
+                }
+              }
+
+              tempGeometry.dispose();
+            }
+          });
+
+          if (allPositions.length === 0) {
+            reject(new Error(`No vertices found in GLTF ${path}`));
+            return;
+          }
+
+          const sourcePositions = new Float32Array(allPositions);
+          const originalCount = allPositions.length / 3;
+
+          // Resample to target count
+          const sampledPositions = resampleParticles(
+            sourcePositions,
+            originalCount,
+            targetCount
+          );
+
+          // Center and normalize
+          const normalizedPositions = normalizePointCloud(sampledPositions, targetCount);
+
+          // Cache the result
+          modelCache.set(shapeType, normalizedPositions);
+
+          // Clean up GLTF resources
+          gltf.scene.traverse((child) => {
+            if (child instanceof THREE.Mesh) {
+              child.geometry.dispose();
+              if (child.material) {
+                if (Array.isArray(child.material)) {
+                  child.material.forEach(m => m.dispose());
+                } else {
+                  child.material.dispose();
+                }
+              }
+            }
+          });
+
+          resolve(normalizedPositions);
+        } catch (error) {
+          console.error(`Error processing GLTF ${path}:`, error);
           reject(error);
         }
       },

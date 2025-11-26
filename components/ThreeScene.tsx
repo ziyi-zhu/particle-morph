@@ -8,9 +8,10 @@ interface ThreeSceneProps {
   shape: ShapeType;
   color: string;
   expansionFactor: number; // 0 (Shape) to 1 (Random Chaos)
+  isLoading?: boolean;
 }
 
-export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionFactor }) => {
+export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionFactor, isLoading = false }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -30,6 +31,7 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
   const currentPositionsRef = useRef<Float32Array>(new Float32Array(0));
   const expansionFactorRef = useRef(expansionFactor);
   const particleColorsRef = useRef<Float32Array>(new Float32Array(0));
+  const isLoadingRef = useRef(isLoading);
   
   // Drag rotation state
   const isDraggingRef = useRef(false);
@@ -37,16 +39,22 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
   const lastMouseXRef = useRef(0);
   const lastTimeRef = useRef(0);
   
-  // Loading state
-  const [isLoading, setIsLoading] = useState(true);
+  // Track if we've loaded at least one model
   const isInitializedRef = useRef(false);
+  
+  // Loading sphere positions
+  const loadingSpherePositionsRef = useRef<Float32Array>(new Float32Array(0));
 
-  // Sync prop to ref
+  // Sync props to refs
   useEffect(() => {
     expansionFactorRef.current = expansionFactor;
   }, [expansionFactor]);
+  
+  useEffect(() => {
+    isLoadingRef.current = isLoading;
+  }, [isLoading]);
 
-  // Generate Chaos Positions (Uniform Random Cloud) Once
+  // Generate Chaos Positions and Loading Sphere Once
   useEffect(() => {
     const count = PARTICLE_COUNT * 3;
     const chaos = new Float32Array(count);
@@ -56,6 +64,26 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
         chaos[i] = (Math.random() - 0.5) * spread;
     }
     chaosPositionsRef.current = chaos;
+    
+    // Generate loading sphere positions
+    const loadingSphere = new Float32Array(count);
+    const radius = 30;
+    
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const i3 = i * 3;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(2 * Math.random() - 1);
+      
+      loadingSphere[i3] = radius * Math.sin(phi) * Math.cos(theta);
+      loadingSphere[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+      loadingSphere[i3 + 2] = radius * Math.cos(phi);
+    }
+    loadingSpherePositionsRef.current = loadingSphere;
+    
+    // Initialize current positions to the loading sphere
+    if (currentPositionsRef.current.length === 0) {
+      currentPositionsRef.current = new Float32Array(loadingSphere);
+    }
   }, []);
 
   // Generate initial texture for particles
@@ -89,13 +117,6 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
         if (cancelled) return;
         
         targetPositionsRef.current = newPositions;
-        
-        // If first run, set current positions to new positions
-        if (currentPositionsRef.current.length === 0) {
-          currentPositionsRef.current = new Float32Array(newPositions);
-        }
-        
-        setIsLoading(false);
       } catch (error) {
         console.error('Failed to load model:', error);
       }
@@ -238,21 +259,8 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
       mountRef.current.appendChild(renderer.domElement);
       rendererRef.current = renderer;
 
-      // Geometry - Load initial model
+      // Geometry - Start with loading sphere positions
       const geometry = new THREE.BufferGeometry();
-      try {
-        const positions = await loadModelParticles(shape, PARTICLE_COUNT);
-        targetPositionsRef.current = positions;
-        currentPositionsRef.current = new Float32Array(positions);
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Failed to load initial model:', error);
-        // Create empty positions as fallback
-        const positions = new Float32Array(PARTICLE_COUNT * 3);
-        targetPositionsRef.current = positions;
-        currentPositionsRef.current = positions;
-      }
-      
       geometry.setAttribute('position', new THREE.BufferAttribute(currentPositionsRef.current, 3));
       geometryRef.current = geometry;
 
@@ -342,15 +350,16 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
       };
       window.addEventListener('resize', handleResize);
 
-      // Drag rotation handlers
+      // Drag rotation handlers (disabled during loading)
       const handleMouseDown = (e: MouseEvent) => {
+        if (isLoadingRef.current) return;
         isDraggingRef.current = true;
         lastMouseXRef.current = e.clientX;
         lastTimeRef.current = time;
       };
 
       const handleMouseMove = (e: MouseEvent) => {
-        if (!isDraggingRef.current) return;
+        if (!isDraggingRef.current || isLoadingRef.current) return;
         
         const deltaX = e.clientX - lastMouseXRef.current;
         // Convert pixel movement to rotation (sensitivity factor)
@@ -364,8 +373,9 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
         lastTimeRef.current = time;
       };
 
-      // Touch handlers for mobile
+      // Touch handlers for mobile (disabled during loading)
       const handleTouchStart = (e: TouchEvent) => {
+        if (isLoadingRef.current) return;
         if (e.touches.length === 1) {
           isDraggingRef.current = true;
           lastMouseXRef.current = e.touches[0].clientX;
@@ -374,7 +384,7 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
       };
 
       const handleTouchMove = (e: TouchEvent) => {
-        if (!isDraggingRef.current || e.touches.length !== 1) return;
+        if (!isDraggingRef.current || e.touches.length !== 1 || isLoadingRef.current) return;
         
         const deltaX = e.touches[0].clientX - lastMouseXRef.current;
         const rotationDelta = (deltaX / window.innerWidth) * Math.PI * 2;
@@ -420,32 +430,48 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
         }
 
         const positions = geometryRef.current.attributes.position.array as Float32Array;
-        const targets = targetPositionsRef.current; // The current Shape
-        const chaos = chaosPositionsRef.current;    // The Random Cloud
         const current = currentPositionsRef.current;
+        const lerpSpeed = 0.03; // Slower morphing speed for smoother transitions
         
-        // When morph < 0.5, show 100% form (mix = 0)
-        const rawMix = expansionFactorRef.current;
-        const mix = rawMix < 0.4 ? 0 : rawMix;
-        const lerpSpeed = 0.08; 
-
-        for (let i = 0; i < PARTICLE_COUNT * 3; i++) {
-            const shapePos = targets[i];
-            const chaosPos = chaos[i];
-            
-            // Linear interpolation between Shape and Chaos based on expansion factor
-            // When mix is 0, goal is shapePos.
-            // When mix is 1, goal is chaosPos.
-            let goal = shapePos + (chaosPos - shapePos) * mix;
-
-            // Optional: Add a slight breath/pulse to the expanded state to make it feel alive
-            if (mix > 0.1) {
-                goal += Math.sin(time * 3 + i) * (mix * 0.5);
-            }
-
-            // Move particle towards goal
+        // When loading, morph to the loading sphere
+        if (isLoadingRef.current) {
+          const loadingSphere = loadingSpherePositionsRef.current;
+          
+          for (let i = 0; i < PARTICLE_COUNT * 3; i++) {
+            const goal = loadingSphere[i];
             current[i] += (goal - current[i]) * lerpSpeed;
             positions[i] = current[i];
+          }
+        } else {
+          // Normal morphing between shape and chaos
+          const targets = targetPositionsRef.current; // The current Shape
+          const chaos = chaosPositionsRef.current;    // The Random Cloud
+          
+          // Only morph if we have valid target positions
+          if (targets.length > 0) {
+            // When morph < 0.4, show 100% form (mix = 0)
+            const rawMix = expansionFactorRef.current;
+            const mix = rawMix < 0.4 ? 0 : rawMix;
+
+            for (let i = 0; i < PARTICLE_COUNT * 3; i++) {
+                const shapePos = targets[i];
+                const chaosPos = chaos[i];
+                
+                // Linear interpolation between Shape and Chaos based on expansion factor
+                // When mix is 0, goal is shapePos.
+                // When mix is 1, goal is chaosPos.
+                let goal = shapePos + (chaosPos - shapePos) * mix;
+
+                // Optional: Add a slight breath/pulse to the expanded state to make it feel alive
+                if (mix > 0.1) {
+                    goal += Math.sin(time * 3 + i) * (mix * 0.5);
+                }
+
+                // Move particle towards goal
+                current[i] += (goal - current[i]) * lerpSpeed;
+                positions[i] = current[i];
+            }
+          }
         }
 
         geometryRef.current.attributes.position.needsUpdate = true;
@@ -519,14 +545,5 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run once on mount
 
-  return (
-    <>
-      <div ref={mountRef} className="absolute inset-0 z-0" />
-      {isLoading && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center">
-          <div className="text-white/50 text-sm">Loading models...</div>
-        </div>
-      )}
-    </>
-  );
+  return <div ref={mountRef} className="absolute inset-0 z-0" />;
 };

@@ -2,13 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { ThreeScene } from './components/ThreeScene';
 import { Controls } from './components/Controls';
 import { ShapeType } from './types';
-import { DEFAULT_COLOR, ORDERED_SHAPES } from './constants';
+import { DEFAULT_COLOR, ORDERED_SHAPES, DESIGNATION_MAP } from './constants';
 import { preloadAllModels } from './services/modelLoader';
+import { Send } from 'lucide-react';
 
 const App: React.FC = () => {
   const [color, setColor] = useState<string>(DEFAULT_COLOR);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [hasStarted, setHasStarted] = useState<boolean>(false);
   const [modelsLoaded, setModelsLoaded] = useState<boolean>(false);
+  const [designation, setDesignation] = useState<string>('');
+  const [designationError, setDesignationError] = useState<string>('');
   
   // scrollPos drives everything. 
   // Integer values = specific models (0=Bunny, 1=Cat, 2=Table, 3=Zaghetto)
@@ -39,18 +43,19 @@ const App: React.FC = () => {
   const distFromInteger = Math.abs(normalizedPos - activeIndex);
   const expansionFactor = distFromInteger * 2; // Map 0..0.5 to 0..1
 
-  // Handle Wheel Scroll
+  // Handle Wheel Scroll (disabled during loading)
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
+      if (!modelsLoaded) return; // Disable scrolling while loading
       e.preventDefault(); // Prevent default page scrolling
-      const delta = e.deltaY * 0.001;
+      const delta = e.deltaY * 0.0001;
       setScrollPos(prev => prev + delta);
     };
 
     // Use passive: false to allow preventDefault
     window.addEventListener('wheel', handleWheel, { passive: false });
     return () => window.removeEventListener('wheel', handleWheel);
-  }, []);
+  }, [modelsLoaded]);
 
   const handleSetShape = (shape: ShapeType) => {
     const index = ORDERED_SHAPES.indexOf(shape);
@@ -82,8 +87,30 @@ const App: React.FC = () => {
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
 
-  // Preload all models at startup
+  // Handle designation submission
+  const handleDesignationSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmedDesignation = designation.trim();
+    
+    if (!trimmedDesignation) {
+      setDesignationError('Please enter a designation');
+      return;
+    }
+    
+    if (!DESIGNATION_MAP[trimmedDesignation]) {
+      setDesignationError('Designation not found');
+      return;
+    }
+    
+    // Valid designation - proceed
+    setDesignationError('');
+    setHasStarted(true);
+  };
+
+  // Preload all models after user submits valid designation
   useEffect(() => {
+    if (!hasStarted) return;
+    
     preloadAllModels()
       .then(() => {
         setModelsLoaded(true);
@@ -92,29 +119,49 @@ const App: React.FC = () => {
         console.error('Failed to preload models:', error);
         setModelsLoaded(true); // Still show the app even if loading fails
       });
-  }, []);
+  }, [hasStarted]);
 
   return (
     <div className="relative w-full h-screen bg-[#050505] overflow-hidden selection:bg-none">
       
-      {/* Loading Screen */}
-      {!modelsLoaded && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-[#050505]">
-          <div className="flex gap-2 justify-center">
-            <div className="w-3 h-3 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-            <div className="w-3 h-3 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-            <div className="w-3 h-3 bg-white/50 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-          </div>
-        </div>
-      )}
+      {/* 3D Scene Background - Always rendered */}
+      <ThreeScene 
+        shape={currentShape} 
+        color={color} 
+        expansionFactor={expansionFactor}
+        isLoading={!modelsLoaded}
+      />
 
-      {/* 3D Scene Background - Only render when loaded */}
-      {modelsLoaded && (
-        <ThreeScene 
-          shape={currentShape} 
-          color={color} 
-          expansionFactor={expansionFactor} 
-        />
+      {/* Designation Input Panel - Show before user starts */}
+      {!hasStarted && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
+          <form onSubmit={handleDesignationSubmit} className="bg-black/60 backdrop-blur-xl border border-white/10 p-6 rounded-xl shadow-2xl space-y-4 w-full max-w-md">
+            <label className="text-xs uppercase font-bold tracking-wider text-gray-400 block">
+              Designation
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={designation}
+                onChange={(e) => {
+                  setDesignation(e.target.value);
+                  setDesignationError('');
+                }}
+                placeholder="Enter designation"
+                className="w-full px-4 py-3 pr-12 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-white/20 focus:bg-white/20 focus:shadow-[0_0_15px_rgba(255,255,255,0.3)] focus:scale-[1.02] transition-all duration-300"
+              />
+              <button
+                type="submit"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-white/60 hover:text-white transition-all duration-300 hover:scale-105"
+              >
+                <Send size={18} />
+              </button>
+            </div>
+            {designationError && (
+              <p className="text-red-400 text-sm">{designationError}</p>
+            )}
+          </form>
+        </div>
       )}
 
       {/* UI Overlay - Only render when loaded */}

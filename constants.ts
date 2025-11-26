@@ -12,16 +12,24 @@ export const ORDERED_SHAPES = [
   ShapeType.WEDDING
 ];
 
-// Map shape types to file paths (PCD or OBJ)
+// Map of designations to model lists
+export const DESIGNATION_MAP: Record<string, ShapeType[]> = {
+  'SH 2-275': [ShapeType.COUCH, ShapeType.GARDEN, ShapeType.KISS, ShapeType.NIGHT, ShapeType.WEDDING],
+  // Add more designations here as needed
+};
+
+// Map shape types to file paths (GLTF)
 export const MODEL_PATHS: Record<ShapeType, string> = {
-  [ShapeType.COUCH]: '/models/couch.obj',
-  [ShapeType.GARDEN]: '/models/garden.obj',
-  [ShapeType.KISS]: '/models/kiss.obj',
-  [ShapeType.NIGHT]: '/models/night.obj',
-  [ShapeType.WEDDING]: '/models/wedding.obj'
+  [ShapeType.COUCH]: '/models/couch.gltf',
+  [ShapeType.GARDEN]: '/models/garden.gltf',
+  [ShapeType.KISS]: '/models/kiss.gltf',
+  [ShapeType.NIGHT]: '/models/night.gltf',
+  [ShapeType.WEDDING]: '/models/wedding.gltf'
 };
 
 // Determine file type from extension
-export function getModelFileType(path: string): 'pcd' | 'obj' {
-  return path.endsWith('.obj') ? 'obj' : 'pcd';
+export function getModelFileType(path: string): 'pcd' | 'obj' | 'gltf' {
+  if (path.endsWith('.gltf') || path.endsWith('.glb')) return 'gltf';
+  if (path.endsWith('.obj')) return 'obj';
+  return 'pcd';
 }
