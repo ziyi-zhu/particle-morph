@@ -1,13 +1,13 @@
-export enum ShapeType {
-  COUCH = 'couch',
-  GARDEN = 'garden',
-  KISS = 'kiss',
-  NIGHT = 'night',
-  WEDDING = 'wedding'
+import { LucideIcon } from 'lucide-react';
+
+export interface ModelConfig {
+  icon: LucideIcon;
+  path: string;
+  label: string;
 }
 
 export interface ParticleConfig {
   color: string;
-  shape: ShapeType;
+  path: string;
   particleCount: number;
 }

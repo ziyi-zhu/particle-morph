@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { ThreeScene } from './components/ThreeScene';
 import { Controls } from './components/Controls';
-import { ShapeType } from './types';
-import { DEFAULT_COLOR, ORDERED_SHAPES, DESIGNATION_MAP } from './constants';
+import { ModelConfig } from './types';
+import { DEFAULT_COLOR, DESIGNATION_MAP } from './constants';
 import { preloadAllModels } from './services/modelLoader';
 import { Send } from 'lucide-react';
 
@@ -13,15 +13,16 @@ const App: React.FC = () => {
   const [modelsLoaded, setModelsLoaded] = useState<boolean>(false);
   const [designation, setDesignation] = useState<string>('');
   const [designationError, setDesignationError] = useState<string>('');
+  const [activeModels, setActiveModels] = useState<ModelConfig[]>([]);
   
   // scrollPos drives everything. 
-  // Integer values = specific models (0=Bunny, 1=Cat, 2=Table, 3=Zaghetto)
+  // Integer values = specific models
   // X.5 values = Maximum Chaos
   // Start at -0.5 (chaos before first model) so scrolling down goes to first model
   const [scrollPos, setScrollPos] = useState<number>(-0.5);
 
   // Derived State Logic
-  const shapeCount = ORDERED_SHAPES.length;
+  const shapeCount = activeModels.length;
   
   // Normalize scrollPos to be positive for modulo math
   // We allow negative scroll, so we assume a loop behavior
@@ -34,7 +35,7 @@ const App: React.FC = () => {
   const activeIndex = Math.round(normalizedPos);
   // Safe modulo to get actual array index
   const safeIndex = ((activeIndex % shapeCount) + shapeCount) % shapeCount;
-  const currentShape = ORDERED_SHAPES[safeIndex];
+  const currentModel = activeModels[safeIndex];
 
   // Expansion Factor (Chaos)
   // Distance from nearest integer. 
@@ -57,10 +58,10 @@ const App: React.FC = () => {
     return () => window.removeEventListener('wheel', handleWheel);
   }, [modelsLoaded]);
 
-  const handleSetShape = (shape: ShapeType) => {
-    const index = ORDERED_SHAPES.indexOf(shape);
+  const handleSetModel = (path: string) => {
+    const index = activeModels.findIndex(model => model.path === path);
     if (index !== -1) {
-      // Jump scroll position to the canonical integer for that shape
+      // Jump scroll position to the canonical integer for that model
       // To keep it smooth, we could find the nearest multiple, but jumping to the base index is acceptable
       // Finding nearest multiple to current scrollPos to avoid massive jumps:
       const currentRound = Math.round(scrollPos);
@@ -97,21 +98,25 @@ const App: React.FC = () => {
       return;
     }
     
-    if (!DESIGNATION_MAP[trimmedDesignation]) {
+    // Case insensitive lookup
+    const designationKey = Object.keys(DESIGNATION_MAP).find(
+      key => key.toLowerCase() === trimmedDesignation.toLowerCase()
+    );
+    
+    if (!designationKey) {
       setDesignationError('Designation not found');
       return;
     }
     
     // Valid designation - proceed
     setDesignationError('');
+    const models = DESIGNATION_MAP[designationKey];
+    setActiveModels(models);
     setHasStarted(true);
-  };
-
-  // Preload all models after user submits valid designation
-  useEffect(() => {
-    if (!hasStarted) return;
     
-    preloadAllModels()
+    // Preload all models
+    const paths = models.map(m => m.path);
+    preloadAllModels(paths)
       .then(() => {
         setModelsLoaded(true);
       })
@@ -119,17 +124,17 @@ const App: React.FC = () => {
         console.error('Failed to preload models:', error);
         setModelsLoaded(true); // Still show the app even if loading fails
       });
-  }, [hasStarted]);
+  };
 
   return (
     <div className="relative w-full h-screen bg-[#050505] overflow-hidden selection:bg-none">
       
       {/* 3D Scene Background - Always rendered */}
       <ThreeScene 
-        shape={currentShape} 
+        modelPath={currentModel?.path} 
         color={color} 
         expansionFactor={expansionFactor}
-        isLoading={!modelsLoaded}
+        isLoading={!modelsLoaded || !currentModel}
       />
 
       {/* Designation Input Panel - Show before user starts */}
@@ -165,15 +170,15 @@ const App: React.FC = () => {
       )}
 
       {/* UI Overlay - Only render when loaded */}
-      {modelsLoaded && (
+      {modelsLoaded && currentModel && (
         <Controls 
-          currentShape={currentShape}
-          setShape={handleSetShape}
+          currentModelPath={currentModel.path}
+          setModel={handleSetModel}
           color={color}
           setColor={setColor}
           toggleFullscreen={toggleFullscreen}
           isFullscreen={isFullscreen}
-          expansionFactor={expansionFactor}
+          activeModels={activeModels}
         />
       )}
 

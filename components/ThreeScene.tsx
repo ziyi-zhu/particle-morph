@@ -1,17 +1,16 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { PARTICLE_COUNT } from '../constants';
-import { ShapeType } from '../types';
 import { loadModelParticles } from '../services/modelLoader';
 
 interface ThreeSceneProps {
-  shape: ShapeType;
+  modelPath?: string;
   color: string;
   expansionFactor: number; // 0 (Shape) to 1 (Random Chaos)
   isLoading?: boolean;
 }
 
-export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionFactor, isLoading = false }) => {
+export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expansionFactor, isLoading = false }) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -106,13 +105,15 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
     return texture;
   }, []);
 
-  // Update Geometry when Shape Changes
+  // Update Geometry when Model Path Changes
   useEffect(() => {
+    if (!modelPath) return; // Skip if no model path yet
+    
     let cancelled = false;
     
-    const loadShape = async () => {
+    const loadModel = async () => {
       try {
-        const newPositions = await loadModelParticles(shape, PARTICLE_COUNT);
+        const newPositions = await loadModelParticles(modelPath, PARTICLE_COUNT);
         
         if (cancelled) return;
         
@@ -122,12 +123,12 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ shape, color, expansionF
       }
     };
     
-    loadShape();
+    loadModel();
     
     return () => {
       cancelled = true;
     };
-  }, [shape]);
+  }, [modelPath]);
 
   // Generate particle colors based on chosen color with variations
   const generateParticleColors = (baseColor: string): Float32Array => {

@@ -1,44 +1,26 @@
 import React from 'react';
-import { ShapeType } from '../types';
-import { Palette, Sofa, Flower2, Heart, Moon, Sparkles, Maximize2, Minimize2, MousePointer2 } from 'lucide-react';
-import { ORDERED_SHAPES } from '../constants';
+import { ModelConfig } from '../types';
+import { Palette, Maximize2, Minimize2 } from 'lucide-react';
 
 interface ControlsProps {
-  currentShape: ShapeType;
-  setShape: (s: ShapeType) => void;
+  currentModelPath: string;
+  setModel: (path: string) => void;
   color: string;
   setColor: (c: string) => void;
   toggleFullscreen: () => void;
   isFullscreen: boolean;
-  expansionFactor: number;
+  activeModels: ModelConfig[];
 }
 
 export const Controls: React.FC<ControlsProps> = ({
-  currentShape,
-  setShape,
+  currentModelPath,
+  setModel,
   color,
   setColor,
   toggleFullscreen,
   isFullscreen,
-  expansionFactor
+  activeModels
 }) => {
-  
-  const shapeIcons: Record<ShapeType, React.ElementType> = {
-    [ShapeType.COUCH]: Sofa,
-    [ShapeType.GARDEN]: Flower2,
-    [ShapeType.KISS]: Heart,
-    [ShapeType.NIGHT]: Moon,
-    [ShapeType.WEDDING]: Sparkles
-  };
-  
-  const shapeLabels: Record<ShapeType, string> = {
-    [ShapeType.COUCH]: 'Couch',
-    [ShapeType.GARDEN]: 'Garden',
-    [ShapeType.KISS]: 'Kiss',
-    [ShapeType.NIGHT]: 'Night',
-    [ShapeType.WEDDING]: 'Wedding'
-  };
-
   const colors = [
     '#00ffff', // Cyan
     '#ff0055', // Pink
@@ -57,18 +39,18 @@ export const Controls: React.FC<ControlsProps> = ({
         <div>
           <label className="text-xs uppercase font-bold tracking-wider text-gray-400 mb-3 block">Model Cycle</label>
           <div className="grid grid-cols-5 gap-2">
-            {ORDERED_SHAPES.map((shapeType) => {
-              const Icon = shapeIcons[shapeType];
+            {activeModels.map((model) => {
+              const Icon = model.icon;
               return (
                 <button
-                  key={shapeType}
-                  onClick={() => setShape(shapeType)}
+                  key={model.path}
+                  onClick={() => setModel(model.path)}
                   className={`flex items-center justify-center p-2 rounded-lg transition-all duration-300 ${
-                    currentShape === shapeType 
+                    currentModelPath === model.path 
                       ? 'bg-white/20 text-white shadow-[0_0_15px_rgba(255,255,255,0.3)] scale-110' 
                       : 'bg-white/5 text-gray-500 hover:bg-white/10 hover:text-gray-300'
                   }`}
-                  title={shapeLabels[shapeType]}
+                  title={model.label}
                 >
                   <Icon size={18} />
                 </button>

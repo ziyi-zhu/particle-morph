@@ -2,36 +2,34 @@ import * as THREE from 'three';
 import { PCDLoader } from 'three/examples/jsm/loaders/PCDLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { ShapeType } from '../types';
-import { MODEL_PATHS, PARTICLE_COUNT, getModelFileType } from '../constants';
+import { PARTICLE_COUNT, getModelFileType } from '../constants';
 
-// Cache loaded model data
-const modelCache: Map<ShapeType, Float32Array> = new Map();
+// Cache loaded model data by path
+const modelCache: Map<string, Float32Array> = new Map();
 
 /**
  * Load a model file (PCD, OBJ, or GLTF) and extract particle positions
- * @param shapeType - The shape type to load
+ * @param path - The model file path
  * @param targetCount - Target number of particles (will resample if needed)
  * @returns Float32Array of particle positions [x, y, z, x, y, z, ...]
  */
 export async function loadModelParticles(
-  shapeType: ShapeType,
+  path: string,
   targetCount: number = PARTICLE_COUNT
 ): Promise<Float32Array> {
   // Check cache first
-  if (modelCache.has(shapeType)) {
-    return modelCache.get(shapeType)!;
+  if (modelCache.has(path)) {
+    return modelCache.get(path)!;
   }
 
-  const path = MODEL_PATHS[shapeType];
   const fileType = getModelFileType(path);
 
   if (fileType === 'pcd') {
-    return loadPCDParticles(path, shapeType, targetCount);
+    return loadPCDParticles(path, targetCount);
   } else if (fileType === 'gltf') {
-    return loadGLTFParticles(path, shapeType, targetCount);
+    return loadGLTFParticles(path, targetCount);
   } else {
-    return loadOBJParticles(path, shapeType, targetCount);
+    return loadOBJParticles(path, targetCount);
   }
 }
 
@@ -40,7 +38,6 @@ export async function loadModelParticles(
  */
 async function loadPCDParticles(
   path: string,
-  shapeType: ShapeType,
   targetCount: number
 ): Promise<Float32Array> {
   const loader = new PCDLoader();
@@ -71,7 +68,7 @@ async function loadPCDParticles(
         const normalizedPositions = normalizePointCloud(sampledPositions, targetCount);
 
         // Cache the result
-        modelCache.set(shapeType, normalizedPositions);
+        modelCache.set(path, normalizedPositions);
 
         // Clean up
         geometry.dispose();
@@ -95,7 +92,6 @@ async function loadPCDParticles(
  */
 async function loadOBJParticles(
   path: string,
-  shapeType: ShapeType,
   targetCount: number
 ): Promise<Float32Array> {
   const loader = new OBJLoader();
@@ -144,7 +140,7 @@ async function loadOBJParticles(
           const normalizedPositions = normalizePointCloud(sampledPositions, targetCount);
 
           // Cache the result
-          modelCache.set(shapeType, normalizedPositions);
+          modelCache.set(path, normalizedPositions);
 
           // Clean up
           object.traverse((child) => {
@@ -180,7 +176,6 @@ async function loadOBJParticles(
  */
 async function loadGLTFParticles(
   path: string,
-  shapeType: ShapeType,
   targetCount: number
 ): Promise<Float32Array> {
   const loader = new GLTFLoader();
@@ -236,7 +231,7 @@ async function loadGLTFParticles(
           const normalizedPositions = normalizePointCloud(sampledPositions, targetCount);
 
           // Cache the result
-          modelCache.set(shapeType, normalizedPositions);
+          modelCache.set(path, normalizedPositions);
 
           // Clean up GLTF resources
           gltf.scene.traverse((child) => {
@@ -357,11 +352,11 @@ function normalizePointCloud(
 }
 
 /**
- * Preload all model files
+ * Preload all model files from a list of paths
  */
-export async function preloadAllModels(): Promise<void> {
-  const promises = Object.values(ShapeType).map(shape =>
-    loadModelParticles(shape as ShapeType, PARTICLE_COUNT)
+export async function preloadAllModels(paths: string[]): Promise<void> {
+  const promises = paths.map(path =>
+    loadModelParticles(path, PARTICLE_COUNT)
   );
   await Promise.all(promises);
 }
