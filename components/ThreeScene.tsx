@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PARTICLE_COUNT } from '../constants';
 import { loadModelParticles } from '../services/modelLoader';
 
@@ -19,6 +20,7 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expans
   const geometryRef = useRef<THREE.BufferGeometry | null>(null);
   const materialRef = useRef<THREE.PointsMaterial | null>(null);
   const animationFrameRef = useRef<number>(0);
+  const controlsRef = useRef<OrbitControls | null>(null);
   
   // Universe background particles
   const universeParticlesRef = useRef<THREE.Points | null>(null);
@@ -31,18 +33,20 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expans
   const expansionFactorRef = useRef(expansionFactor);
   const particleColorsRef = useRef<Float32Array>(new Float32Array(0));
   const isLoadingRef = useRef(isLoading);
+  const currentColorRef = useRef(color);
   
-  // Drag rotation state
-  const isDraggingRef = useRef(false);
-  const rotationYRef = useRef(0);
-  const lastMouseXRef = useRef(0);
-  const lastTimeRef = useRef(0);
+  // Color gradient parameters for animation loop
+  const colorInsideRef = useRef<THREE.Color>(new THREE.Color('#ff6030'));
+  const colorOutsideRef = useRef<THREE.Color>(new THREE.Color('#1b3984'));
   
   // Track if we've loaded at least one model
   const isInitializedRef = useRef(false);
   
   // Loading sphere positions
   const loadingSpherePositionsRef = useRef<Float32Array>(new Float32Array(0));
+  
+  // Store radial distances for color generation
+  const radialDistancesRef = useRef<Float32Array>(new Float32Array(0));
 
   // Sync props to refs
   useEffect(() => {
@@ -53,57 +57,69 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expans
     isLoadingRef.current = isLoading;
   }, [isLoading]);
 
-  // Generate Chaos Positions and Loading Sphere Once
+  // Generate Chaos Positions and Loading Galaxy Once
   useEffect(() => {
     const count = PARTICLE_COUNT * 3;
     const chaos = new Float32Array(count);
-    const spread = 200; // Large spread for the chaos state
+    const spread = 50; // Spread adjusted for closer camera position
     
     for (let i = 0; i < count; i++) {
         chaos[i] = (Math.random() - 0.5) * spread;
     }
     chaosPositionsRef.current = chaos;
     
-    // Generate loading sphere positions
-    const loadingSphere = new Float32Array(count);
-    const radius = 30;
+    // Generate loading galaxy positions (spiral galaxy)
+    // Parameters exactly matching the provided example
+    const loadingGalaxy = new Float32Array(count);
+    const radialDistances = new Float32Array(PARTICLE_COUNT);
+    const galaxyParams = {
+      radius: 10, // Exact value from example
+      branches: 3,
+      spin: 1,
+      randomness: 1,
+      randomnessPower: 1
+    };
     
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       const i3 = i * 3;
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(2 * Math.random() - 1);
       
-      loadingSphere[i3] = radius * Math.sin(phi) * Math.cos(theta);
-      loadingSphere[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
-      loadingSphere[i3 + 2] = radius * Math.cos(phi);
+      // Distance from center
+      const r = Math.random() * galaxyParams.radius;
+      radialDistances[i] = r; // Store for color generation
+      
+      // Which spiral arm
+      const branchIndex = i % galaxyParams.branches;
+      const branchAngle = (branchIndex / galaxyParams.branches) * Math.PI * 2;
+      
+      // Spin angle increases with distance from center
+      const spinAngle = r * galaxyParams.spin;
+      
+      // Add randomness with power curve (more randomness further from center)
+      // Using exact formula from example: (Math.random() - 0.5) gives range -0.5 to 0.5
+      const randomX = Math.pow(Math.random(), galaxyParams.randomnessPower) *
+        (Math.random() - 0.5) *
+        galaxyParams.randomness * r;
+      const randomY = Math.pow(Math.random(), galaxyParams.randomnessPower) *
+        (Math.random() - 0.5) *
+        galaxyParams.randomness * r;
+      const randomZ = Math.pow(Math.random(), galaxyParams.randomnessPower) *
+        (Math.random() - 0.5) *
+        galaxyParams.randomness * r;
+      
+      // Calculate position on spiral arm
+      loadingGalaxy[i3] = Math.cos(branchAngle + spinAngle) * r + randomX;
+      loadingGalaxy[i3 + 1] = randomY;
+      loadingGalaxy[i3 + 2] = Math.sin(branchAngle + spinAngle) * r + randomZ;
     }
-    loadingSpherePositionsRef.current = loadingSphere;
+    loadingSpherePositionsRef.current = loadingGalaxy;
+    radialDistancesRef.current = radialDistances;
     
-    // Initialize current positions to the loading sphere
+    // Initialize current positions to the loading galaxy
     if (currentPositionsRef.current.length === 0) {
-      currentPositionsRef.current = new Float32Array(loadingSphere);
+      currentPositionsRef.current = new Float32Array(loadingGalaxy);
     }
   }, []);
 
-  // Generate initial texture for particles
-  const particleTexture = useMemo(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 32;
-    canvas.height = 32;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
-      gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
-      gradient.addColorStop(0.2, 'rgba(255, 255, 255, 0.8)');
-      gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.2)');
-      gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, 32, 32);
-    }
-    const texture = new THREE.Texture(canvas);
-    texture.needsUpdate = true;
-    return texture;
-  }, []);
 
   // Update Geometry when Model Path Changes
   useEffect(() => {
@@ -130,82 +146,118 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expans
     };
   }, [modelPath]);
 
-  // Generate particle colors based on chosen color with variations
+  // Generate particle colors based on chosen color with galaxy-style gradient
+  // Exactly replicating the example's color generation algorithm
   const generateParticleColors = (baseColor: string): Float32Array => {
     const colors = new Float32Array(PARTICLE_COUNT * 3);
-    const colorObj = new THREE.Color(baseColor);
     
-    // Convert to HSL for hue manipulation
-    const hsl = { h: 0, s: 0, l: 0 };
-    colorObj.getHSL(hsl);
+    // Example uses #ff6030 as insideColor and #1b3984 as outsideColor
+    // We need to derive the outsideColor based on the same relationship
+    const exampleInsideColor = new THREE.Color('#ff6030');
+    const exampleOutsideColor = new THREE.Color('#1b3984');
+    const exampleInsideHSL = { h: 0, s: 0, l: 0 };
+    const exampleOutsideHSL = { h: 0, s: 0, l: 0 };
+    exampleInsideColor.getHSL(exampleInsideHSL);
+    exampleOutsideColor.getHSL(exampleOutsideHSL);
     
+    // Calculate the hue shift from the example
+    let hueShift = exampleOutsideHSL.h - exampleInsideHSL.h;
+    if (hueShift < 0) hueShift += 1;
+    
+    // Inside: use picked color directly (params.insideColor)
+    const colorInside = new THREE.Color(baseColor);
+    
+    // Get picked color HSL to apply shift
+    const pickedHSL = { h: 0, s: 0, l: 0 };
+    colorInside.getHSL(pickedHSL);
+    
+    // Outside: apply the same hue shift, keeping example's saturation and lightness
+    const colorOutside = new THREE.Color().setHSL(
+      (pickedHSL.h + hueShift) % 1,
+      exampleOutsideHSL.s,
+      exampleOutsideHSL.l
+    );
+    
+    const galaxyRadius = 10;
+    const radialDistances = radialDistancesRef.current;
+    
+    // Generate colors exactly like the example
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       const i3 = i * 3;
-      const rand = Math.random();
       
-      // 60% particles: base color with brightness variations (predominant color)
-      if (rand < 0.6) {
-        const brightness = 0.7 + Math.random() * 0.6; // 0.7 to 1.3
-        const hueShift = (Math.random() - 0.5) * 0.2; // Moderate hue variation ±10%
-        const newColor = new THREE.Color().setHSL(
-          (hsl.h + hueShift + 1) % 1,
-          hsl.s * (0.9 + Math.random() * 0.2), // Slight saturation variation
-          hsl.l * brightness
-        );
-        colors[i3] = newColor.r;
-        colors[i3 + 1] = newColor.g;
-        colors[i3 + 2] = newColor.b;
-      }
-      // 25% particles: brighter stars with hue shifts
-      else if (rand < 0.85) {
-        const hueShift = (Math.random() - 0.5) * 0.4; // Larger hue variation ±20%
-        const brightness = 0.8 + Math.random() * 0.5;
-        const whiteness = Math.random() * 0.4; // Less white, more color
-        const newColor = new THREE.Color().setHSL(
-          (hsl.h + hueShift + 1) % 1,
-          hsl.s * (0.7 + whiteness * 0.3), // Desaturate slightly for brightness
-          Math.min(0.95, hsl.l * brightness + whiteness * 0.3)
-        );
-        colors[i3] = newColor.r;
-        colors[i3 + 1] = newColor.g;
-        colors[i3 + 2] = newColor.b;
-      }
-      // 10% particles: complementary/accent colors with larger hue shifts
-      else if (rand < 0.95) {
-        const hueShift = (Math.random() - 0.5) * 0.6; // Large hue variation ±30%
-        const brightness = 0.6 + Math.random() * 0.5;
-        const newColor = new THREE.Color().setHSL(
-          (hsl.h + hueShift + 1) % 1,
-          hsl.s * (0.8 + Math.random() * 0.4),
-          hsl.l * brightness
-        );
-        colors[i3] = newColor.r;
-        colors[i3 + 1] = newColor.g;
-        colors[i3 + 2] = newColor.b;
-      }
-      // 5% particles: very bright stars with rainbow variety
-      else {
-        const hueShift = (Math.random() - 0.5) * 0.5; // ±25% hue variation
-        const brightness = 1.2 + Math.random() * 0.3;
-        const newColor = new THREE.Color().setHSL(
-          (hsl.h + hueShift + 1) % 1,
-          hsl.s * (0.7 + Math.random() * 0.3),
-          Math.min(0.95, hsl.l * brightness)
-        );
-        colors[i3] = newColor.r;
-        colors[i3 + 1] = newColor.g;
-        colors[i3 + 2] = newColor.b;
-      }
+      // Get actual radial distance for this particle
+      const r = radialDistances.length > 0 ? radialDistances[i] : (i / PARTICLE_COUNT) * galaxyRadius;
+      
+      // Exact replication: mixedColor.lerp(colorOutside, r / params.radius)
+      const mixedColor = colorInside.clone();
+      mixedColor.lerp(colorOutside, r / galaxyRadius);
+      
+      colors[i3] = mixedColor.r;
+      colors[i3 + 1] = mixedColor.g;
+      colors[i3 + 2] = mixedColor.b;
     }
     
     return colors;
   };
 
-  // Update particle colors when color changes
+  // Update particle colors when color changes - apply distance-based gradient to all particles
   useEffect(() => {
+    currentColorRef.current = color;
+    
     if (!geometryRef.current) return;
     
-    const colors = generateParticleColors(color);
+    // Get current positions to calculate distance-based colors
+    const positions = currentPositionsRef.current;
+    const colors = new Float32Array(PARTICLE_COUNT * 3);
+    
+    // Use same color generation as spiral galaxy
+    const exampleInsideColor = new THREE.Color('#ff6030');
+    const exampleOutsideColor = new THREE.Color('#1b3984');
+    const exampleInsideHSL = { h: 0, s: 0, l: 0 };
+    const exampleOutsideHSL = { h: 0, s: 0, l: 0 };
+    exampleInsideColor.getHSL(exampleInsideHSL);
+    exampleOutsideColor.getHSL(exampleOutsideHSL);
+    
+    let hueShift = exampleOutsideHSL.h - exampleInsideHSL.h;
+    if (hueShift < 0) hueShift += 1;
+    
+    const colorInside = new THREE.Color(color);
+    const pickedHSL = { h: 0, s: 0, l: 0 };
+    colorInside.getHSL(pickedHSL);
+    
+    const colorOutside = new THREE.Color().setHSL(
+      (pickedHSL.h + hueShift) % 1,
+      exampleOutsideHSL.s,
+      exampleOutsideHSL.l
+    );
+    
+    // Store colors for animation loop use
+    colorInsideRef.current = colorInside.clone();
+    colorOutsideRef.current = colorOutside.clone();
+    
+    // Calculate colors based on distance from center for ALL particles
+    const maxRadius = 10; // Same as galaxy radius
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const i3 = i * 3;
+      
+      // Calculate distance from center
+      const x = positions[i3] || 0;
+      const y = positions[i3 + 1] || 0;
+      const z = positions[i3 + 2] || 0;
+      const distance = Math.sqrt(x * x + y * y + z * z);
+      
+      // Normalize distance (clamp to maxRadius)
+      const normalizedDistance = Math.min(distance / maxRadius, 1);
+      
+      // Apply same color gradient as galaxy
+      const mixedColor = colorInside.clone();
+      mixedColor.lerp(colorOutside, normalizedDistance);
+      
+      colors[i3] = mixedColor.r;
+      colors[i3 + 1] = mixedColor.g;
+      colors[i3 + 2] = mixedColor.b;
+    }
+    
     particleColorsRef.current = colors;
     
     if (geometryRef.current.attributes.color) {
@@ -222,14 +274,29 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expans
     }
     
     // Update universe particle colors with same style
-    if (universeGeometryRef.current) {
+    if (universeGeometryRef.current && universeGeometryRef.current.attributes.position) {
       const universeCount = 4000;
-      const universeColors = generateParticleColors(color);
-      // Use only the first 4000 colors from the generated array
-      const trimmedColors = universeColors.slice(0, universeCount * 3);
+      const universePositions = universeGeometryRef.current.attributes.position.array as Float32Array;
+      const universeColors = new Float32Array(universeCount * 3);
+      
+      for (let i = 0; i < universeCount; i++) {
+        const i3 = i * 3;
+        const x = universePositions[i3];
+        const y = universePositions[i3 + 1];
+        const z = universePositions[i3 + 2];
+        const distance = Math.sqrt(x * x + y * y + z * z);
+        const normalizedDistance = Math.min(distance / maxRadius, 1);
+        
+        const mixedColor = colorInside.clone();
+        mixedColor.lerp(colorOutside, normalizedDistance);
+        
+        universeColors[i3] = mixedColor.r;
+        universeColors[i3 + 1] = mixedColor.g;
+        universeColors[i3 + 2] = mixedColor.b;
+      }
       
       if (universeGeometryRef.current.attributes.color) {
-        universeGeometryRef.current.attributes.color.array = trimmedColors;
+        universeGeometryRef.current.attributes.color.array = universeColors;
         universeGeometryRef.current.attributes.color.needsUpdate = true;
       }
     }
@@ -248,9 +315,12 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expans
       scene.fog = new THREE.FogExp2(0x050505, 0.002);
       sceneRef.current = scene;
 
-      // Camera
-      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-      camera.position.z = 60;
+      // Camera - Matching the example exactly
+      const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+      camera.position.x = 3;
+      camera.position.y = 3;
+      camera.position.z = 3;
+      camera.lookAt(0, 0, 0); // Center the view on origin
       cameraRef.current = camera;
 
       // Renderer
@@ -259,6 +329,14 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expans
       renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
       mountRef.current.appendChild(renderer.domElement);
       rendererRef.current = renderer;
+      
+      // OrbitControls - Matching the example exactly
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.autoRotate = true;
+      controls.enableZoom = false; // Disable zooming as requested
+      controls.enablePan = false; // Disable panning (shift+drag)
+      controlsRef.current = controls;
 
       // Geometry - Start with loading sphere positions
       const geometry = new THREE.BufferGeometry();
@@ -270,15 +348,14 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expans
       particleColorsRef.current = initialColors;
       geometry.setAttribute('color', new THREE.BufferAttribute(initialColors, 3));
 
-      // Material
+      // Material - Matching the example exactly
       const material = new THREE.PointsMaterial({
-        size: 0.8,
-        map: particleTexture,
-        transparent: true,
-        opacity: 0.8,
-        blending: THREE.AdditiveBlending,
+        color: '#6359ee', // Base color from example (purple tint)
+        size: 0.01, // Exact value from example
+        sizeAttenuation: true,
         depthWrite: false,
-        vertexColors: true // Enable vertex colors
+        blending: THREE.AdditiveBlending,
+        vertexColors: true
       });
       materialRef.current = material;
 
@@ -293,21 +370,22 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expans
       const universePositions = new Float32Array(universeCount * 3);
       
       // Distribute particles with varied distances for depth
+      // Adjusted for closer camera position (3,3,3)
       for (let i = 0; i < universeCount; i++) {
         const i3 = i * 3;
         
-        // Varied radius: some closer (50-70), some mid (70-100), some far (100-140)
+        // Varied radius: adjusted for closer camera
         const radiusRand = Math.random();
         let radius;
         if (radiusRand < 0.4) {
           // 40% closer particles
-          radius = 50 + Math.random() * 20;
+          radius = 15 + Math.random() * 5;
         } else if (radiusRand < 0.7) {
           // 30% mid-distance particles
-          radius = 70 + Math.random() * 30;
+          radius = 20 + Math.random() * 10;
         } else {
           // 30% far particles
-          radius = 100 + Math.random() * 40;
+          radius = 30 + Math.random() * 20;
         }
         
         const theta = Math.random() * Math.PI * 2;
@@ -328,12 +406,11 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expans
       
       // Use same material properties as main particles
       const universeMaterial = new THREE.PointsMaterial({
-        size: 0.8, // Same size as main particles
-        map: particleTexture,
-        transparent: true,
-        opacity: 0.8, // Same opacity as main particles
-        blending: THREE.AdditiveBlending,
+        color: '#6359ee', // Base color from example
+        size: 0.01, // Exact value from example
+        sizeAttenuation: true,
         depthWrite: false,
+        blending: THREE.AdditiveBlending,
         vertexColors: true
       });
       
@@ -351,86 +428,20 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expans
       };
       window.addEventListener('resize', handleResize);
 
-      // Drag rotation handlers (disabled during loading)
-      const handleMouseDown = (e: MouseEvent) => {
-        if (isLoadingRef.current) return;
-        isDraggingRef.current = true;
-        lastMouseXRef.current = e.clientX;
-        lastTimeRef.current = time;
-      };
-
-      const handleMouseMove = (e: MouseEvent) => {
-        if (!isDraggingRef.current || isLoadingRef.current) return;
-        
-        const deltaX = e.clientX - lastMouseXRef.current;
-        // Convert pixel movement to rotation (sensitivity factor)
-        const rotationDelta = (deltaX / window.innerWidth) * Math.PI * 2;
-        rotationYRef.current += rotationDelta;
-        lastMouseXRef.current = e.clientX;
-      };
-
-      const handleMouseUp = () => {
-        isDraggingRef.current = false;
-        lastTimeRef.current = time;
-      };
-
-      // Touch handlers for mobile (disabled during loading)
-      const handleTouchStart = (e: TouchEvent) => {
-        if (isLoadingRef.current) return;
-        if (e.touches.length === 1) {
-          isDraggingRef.current = true;
-          lastMouseXRef.current = e.touches[0].clientX;
-          lastTimeRef.current = time;
-        }
-      };
-
-      const handleTouchMove = (e: TouchEvent) => {
-        if (!isDraggingRef.current || e.touches.length !== 1 || isLoadingRef.current) return;
-        
-        const deltaX = e.touches[0].clientX - lastMouseXRef.current;
-        const rotationDelta = (deltaX / window.innerWidth) * Math.PI * 2;
-        rotationYRef.current += rotationDelta;
-        lastMouseXRef.current = e.touches[0].clientX;
-      };
-
-      const handleTouchEnd = () => {
-        isDraggingRef.current = false;
-        lastTimeRef.current = time;
-      };
-
-      // Add event listeners
-      const canvas = rendererRef.current.domElement;
-      canvas.addEventListener('mousedown', handleMouseDown);
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-      canvas.addEventListener('touchstart', handleTouchStart);
-      canvas.addEventListener('touchmove', handleTouchMove);
-      canvas.addEventListener('touchend', handleTouchEnd);
-
       // Animation Loop
       let time = 0;
       const animate = () => {
         time += 0.005;
       
+      // Update OrbitControls
+      if (controlsRef.current) {
+        controlsRef.current.update();
+      }
+      
       if (particlesRef.current && geometryRef.current) {
-        // Rotation logic: combine automatic rotation with manual drag rotation
-        if (!isDraggingRef.current) {
-          // When not dragging, add automatic rotation
-          const timeDelta = time - lastTimeRef.current;
-          rotationYRef.current += timeDelta * 0.2;
-          lastTimeRef.current = time;
-        }
-        // Apply rotation to main particles
-        particlesRef.current.rotation.y = rotationYRef.current;
-        particlesRef.current.rotation.x = Math.sin(time * 0.3) * 0.1;
-        
-        // Apply same rotation to universe particles
-        if (universeParticlesRef.current) {
-          universeParticlesRef.current.rotation.y = rotationYRef.current;
-          universeParticlesRef.current.rotation.x = Math.sin(time * 0.3) * 0.1;
-        }
 
         const positions = geometryRef.current.attributes.position.array as Float32Array;
+        const colors = geometryRef.current.attributes.color.array as Float32Array;
         const current = currentPositionsRef.current;
         const lerpSpeed = 0.03; // Slower morphing speed for smoother transitions
         
@@ -479,6 +490,35 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expans
         }
 
         geometryRef.current.attributes.position.needsUpdate = true;
+        
+        // Update colors based on current particle distances from center
+        // This ensures models have the same distance-based color gradient as the spiral
+        const maxRadius = 10;
+        const colorInside = colorInsideRef.current;
+        const colorOutside = colorOutsideRef.current;
+        
+        for (let i = 0; i < PARTICLE_COUNT; i++) {
+          const i3 = i * 3;
+          
+          // Calculate distance from center using current positions
+          const x = positions[i3];
+          const y = positions[i3 + 1];
+          const z = positions[i3 + 2];
+          const distance = Math.sqrt(x * x + y * y + z * z);
+          
+          // Normalize distance
+          const normalizedDistance = Math.min(distance / maxRadius, 1);
+          
+          // Apply color gradient
+          const mixedColor = colorInside.clone();
+          mixedColor.lerp(colorOutside, normalizedDistance);
+          
+          colors[i3] = mixedColor.r;
+          colors[i3 + 1] = mixedColor.g;
+          colors[i3 + 2] = mixedColor.b;
+        }
+        
+        geometryRef.current.attributes.color.needsUpdate = true;
       }
 
       if (rendererRef.current && sceneRef.current && cameraRef.current) {
@@ -493,15 +533,10 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expans
       return () => {
         window.removeEventListener('resize', handleResize);
         
-        // Remove drag event listeners
-        if (rendererRef.current) {
-          const canvas = rendererRef.current.domElement;
-          canvas.removeEventListener('mousedown', handleMouseDown);
-          window.removeEventListener('mousemove', handleMouseMove);
-          window.removeEventListener('mouseup', handleMouseUp);
-          canvas.removeEventListener('touchstart', handleTouchStart);
-          canvas.removeEventListener('touchmove', handleTouchMove);
-          canvas.removeEventListener('touchend', handleTouchEnd);
+        // Dispose OrbitControls
+        if (controlsRef.current) {
+          controlsRef.current.dispose();
+          controlsRef.current = null;
         }
         
         // Cancel animation frame
@@ -534,7 +569,6 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expans
           sceneRef.current = null;
         }
         
-        particleTexture.dispose();
         particlesRef.current = null;
         isInitializedRef.current = false;
       };

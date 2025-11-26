@@ -1,6 +1,6 @@
 import React from 'react';
 import { ModelConfig } from '../types';
-import { Palette, Maximize2, Minimize2 } from 'lucide-react';
+import { Palette, Maximize2, Minimize2, Sparkles } from 'lucide-react';
 
 interface ControlsProps {
   currentModelPath: string;
@@ -22,22 +22,24 @@ export const Controls: React.FC<ControlsProps> = ({
   activeModels
 }) => {
   const colors = [
+    '#ff6030', // Orange-red (default from example)
     '#00ffff', // Cyan
     '#ff0055', // Pink
     '#ffff00', // Yellow
     '#00ff00', // Green
     '#aa00ff', // Purple
-    '#ff8800', // Orange
   ];
 
   return (
     <div className="fixed top-4 left-4 z-50 flex flex-col gap-4 max-w-xs">
       {/* Main Controls */}
-      <div className="bg-black/60 backdrop-blur-xl border border-white/10 p-5 rounded-xl shadow-2xl space-y-6">
+      <div className="bg-black/20 backdrop-blur-xl border border-white/10 p-5 rounded-xl shadow-2xl space-y-6">
         
         {/* Shape Selector */}
         <div>
-          <label className="text-xs uppercase font-bold tracking-wider text-gray-400 mb-3 block">Model Cycle</label>
+          <label className="text-xs uppercase font-bold tracking-wider text-gray-400 mb-3 flex items-center gap-2">
+            <Sparkles size={12} /> Nebulae
+          </label>
           <div className="grid grid-cols-5 gap-2">
             {activeModels.map((model) => {
               const Icon = model.icon;
@@ -93,7 +95,7 @@ export const Controls: React.FC<ControlsProps> = ({
       {/* Footer / Fullscreen */}
       <button 
         onClick={toggleFullscreen}
-        className="self-start flex items-center gap-2 px-4 py-2 bg-black/40 hover:bg-white/10 text-white/80 rounded-lg text-xs backdrop-blur-md transition-colors"
+        className="self-start flex items-center gap-2 px-4 py-2 bg-black/20 hover:bg-white/10 text-white/80 rounded-lg text-xs backdrop-blur-md transition-colors"
       >
         {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
         {isFullscreen ? 'Exit Fullscreen' : 'Fullscreen Mode'}

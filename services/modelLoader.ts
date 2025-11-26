@@ -336,8 +336,8 @@ function normalizePointCloud(
   const sizeZ = maxZ - minZ;
   const maxSize = Math.max(sizeX, sizeY, sizeZ);
 
-  // Target size (larger for better visibility)
-  const targetSize = 60;
+  // Target size (adjusted for closer camera position at 3,3,3 and higher particle count)
+  const targetSize = 5; // Reduced to fit better in camera view
   const scale = maxSize > 0 ? targetSize / maxSize : 1;
 
   // Center and scale all points

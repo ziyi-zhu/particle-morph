@@ -1,9 +1,9 @@
 import { Sofa, Flower2, Heart, Moon, Sparkles, Cake, PawPrint, Church } from 'lucide-react';
 import { ModelConfig } from './types';
 
-export const PARTICLE_COUNT = 25000;
+export const PARTICLE_COUNT = 300000; // Exact count from example
 export const CAMERA_FOV = 75;
-export const DEFAULT_COLOR = '#00ffff';
+export const DEFAULT_COLOR = '#ff6030'; // Orange-red from the example
 
 // Map of designations to model configurations (icon + path pairs)
 export const DESIGNATION_MAP: Record<string, ModelConfig[]> = {

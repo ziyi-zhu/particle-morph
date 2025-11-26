@@ -4,7 +4,7 @@ import { Controls } from './components/Controls';
 import { ModelConfig } from './types';
 import { DEFAULT_COLOR, DESIGNATION_MAP } from './constants';
 import { preloadAllModels } from './services/modelLoader';
-import { Send } from 'lucide-react';
+import { Send, MapPin } from 'lucide-react';
 
 const App: React.FC = () => {
   const [color, setColor] = useState<string>(DEFAULT_COLOR);
@@ -139,10 +139,10 @@ const App: React.FC = () => {
 
       {/* Designation Input Panel - Show before user starts */}
       {!hasStarted && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center p-4">
-          <form onSubmit={handleDesignationSubmit} className="bg-black/60 backdrop-blur-xl border border-white/10 p-6 rounded-xl shadow-2xl space-y-4 w-full max-w-md">
-            <label className="text-xs uppercase font-bold tracking-wider text-gray-400 block">
-              Designation
+        <div className="absolute inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+          <form onSubmit={handleDesignationSubmit} className="bg-black/20 backdrop-blur-xl border border-white/10 p-6 rounded-xl shadow-2xl space-y-4 w-full max-w-md pointer-events-auto">
+            <label className="text-xs uppercase font-bold tracking-wider text-gray-400 flex items-center gap-2">
+              <MapPin size={12} /> Designation
             </label>
             <div className="relative">
               <input
