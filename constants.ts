@@ -15,10 +15,10 @@ export const DESIGNATION_MAP: Record<string, ModelConfig[]> = {
     { icon: Sparkles, path: '/models/wedding.gltf', label: 'Wedding' }
   ],
   'demo': [
-    { icon: PawPrint, path: '/models/bear.gltf', label: 'Bear' },
-    { icon: Church, path: '/models/church.gltf', label: 'Church' },
-    { icon: Heart, path: '/models/love.gltf', label: 'Love' },
-    { icon: Cake, path: '/models/cake.gltf', label: 'Cake' },
+    { icon: PawPrint, path: '/models/cow.glb', label: 'Cow' },
+    { icon: Church, path: '/models/labubu.glb', label: 'Church' },
+    { icon: Heart, path: '/models/truck.glb', label: 'Truck' },
+    { icon: Cake, path: '/models/rose.glb', label: 'Rose' },
     { icon: Sparkles, path: '/models/birthday.gltf', label: 'Birthday' }
   ],
   // Add more designations here as needed
