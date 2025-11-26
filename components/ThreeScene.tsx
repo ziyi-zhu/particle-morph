@@ -61,7 +61,7 @@ export const ThreeScene: React.FC<ThreeSceneProps> = ({ modelPath, color, expans
   useEffect(() => {
     const count = PARTICLE_COUNT * 3;
     const chaos = new Float32Array(count);
-    const spread = 50; // Spread adjusted for closer camera position
+    const spread = 20; // Reduced spread to keep chaos more contained
     
     for (let i = 0; i < count; i++) {
         chaos[i] = (Math.random() - 0.5) * spread;

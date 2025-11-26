@@ -363,8 +363,8 @@ function normalizePointCloud(
 
   // Apply randomness to create nebula-like effect (similar to spiral galaxy)
   // This makes the model forms look more organic and cloud-like
-  const randomness = 0.5; // Amount of randomness (0-1)
-  const randomnessPower = 2; // Power curve for randomness distribution
+  const randomness = 0.3; // Amount of randomness (0-1)
+  const randomnessPower = 3; // Power curve for randomness distribution
   
   for (let i = 0; i < count; i++) {
     const i3 = i * 3;
